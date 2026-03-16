@@ -111,9 +111,15 @@
     .progress-msg { color: var(--sub); font-size: 12px; min-height: 18px; }
 
     /* Piano roll */
-    .roll-wrap { margin-top: 18px; }
+    .roll-wrap { margin-top: 20px; }
     .roll-wrap h3 { font-size: 12px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    canvas { border-radius: 6px; display: block; width: 100%; }
+    .roll-container {
+      display: flex; border-radius: 6px; overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .piano-keys { flex-shrink: 0; width: 36px; background: var(--panel); }
+    .roll-scroll { overflow-x: auto; flex: 1; }
+    canvas { display: block; }
 
     /* Recording indicator */
     .rec-dot {
@@ -166,9 +172,30 @@
     </div>
 
     <div class="roll-wrap" id="roll-wrap" style="display:none">
-      <h3>Note Preview</h3>
-      <canvas id="roll" height="90"></canvas>
+      <h3>Piano Roll</h3>
+      <div class="roll-container">
+        <canvas id="roll-keys"></canvas>
+        <div class="roll-scroll" id="roll-scroll">
+          <canvas id="roll"></canvas>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- ── History ─────────────────────────────────────────── -->
+  <div class="card" id="history-card" style="display:none">
+    <h2>Recent Conversions</h2>
+    <table id="history-table" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="color:var(--sub);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">
+          <th style="text-align:left;padding:0 0 10px">File</th>
+          <th style="text-align:right;padding:0 0 10px">Notes</th>
+          <th style="text-align:right;padding:0 0 10px">Time</th>
+          <th style="padding:0 0 10px"></th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
   </div>
 
   <!-- ── Record & Convert ─────────────────────────────────── -->
@@ -194,6 +221,106 @@
   </div>
 
 <script>
+// ── History ─────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const resp = await fetch('/history');
+  const entries = await resp.json();
+  const card = document.getElementById('history-card');
+  const body = document.getElementById('history-body');
+  if (!entries.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  body.innerHTML = entries.map(e => `
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:10px 0;font-size:13px">${e.filename}</td>
+      <td style="padding:10px 0;text-align:right;color:var(--sub);font-size:12px">${e.note_count}</td>
+      <td style="padding:10px 6px;text-align:right;color:var(--sub);font-size:12px">${e.created_at}</td>
+      <td style="padding:10px 0;text-align:right">
+        <a href="/download/${e.id}" class="btn btn-download" style="display:inline-flex;padding:5px 10px;font-size:12px">⬇</a>
+      </td>
+    </tr>`).join('');
+}
+loadHistory();
+
+// ── Piano Roll ───────────────────────────────────────────────────────────────
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const BLACK = new Set([1,3,6,8,10]); // semitone offsets of black keys
+
+function drawPianoRoll(notes) {
+  if (!notes || !notes.length) return;
+
+  const MIDI_MIN = Math.max(0,  Math.min(...notes.map(n => n.pitch)) - 3);
+  const MIDI_MAX = Math.min(127, Math.max(...notes.map(n => n.pitch)) + 3);
+  const ROWS     = MIDI_MAX - MIDI_MIN + 1;
+  const ROW_H    = 12;
+  const PX_PER_S = 80;
+  const duration = Math.max(...notes.map(n => n.end));
+  const W        = Math.ceil(duration * PX_PER_S);
+  const H        = ROWS * ROW_H;
+  const KEY_W    = 36;
+
+  // ── Keys canvas ──────────────────────────────────────
+  const kc = document.getElementById('roll-keys');
+  kc.width  = KEY_W;
+  kc.height = H;
+  const kx = kc.getContext('2d');
+
+  for (let midi = MIDI_MAX; midi >= MIDI_MIN; midi--) {
+    const y    = (MIDI_MAX - midi) * ROW_H;
+    const semi = midi % 12;
+    const isBlack = BLACK.has(semi);
+    kx.fillStyle = isBlack ? '#1e1e2e' : '#45475a';
+    kx.fillRect(0, y, KEY_W, ROW_H);
+    // draw C label
+    if (semi === 0) {
+      kx.fillStyle = '#89b4fa';
+      kx.font = '8px system-ui';
+      kx.textAlign = 'right';
+      kx.fillText('C' + (Math.floor(midi / 12) - 1), KEY_W - 3, y + ROW_H - 2);
+    }
+    // separator
+    kx.fillStyle = '#11111b';
+    kx.fillRect(0, y + ROW_H - 1, KEY_W, 1);
+  }
+
+  // ── Roll canvas ───────────────────────────────────────
+  const rc = document.getElementById('roll');
+  rc.width  = W;
+  rc.height = H;
+  const rx = rc.getContext('2d');
+
+  // Background rows
+  for (let midi = MIDI_MAX; midi >= MIDI_MIN; midi--) {
+    const y    = (MIDI_MAX - midi) * ROW_H;
+    const semi = midi % 12;
+    rx.fillStyle = BLACK.has(semi) ? '#1a1a2a' : '#252535';
+    rx.fillRect(0, y, W, ROW_H);
+    // Row separator
+    rx.fillStyle = '#11111b';
+    rx.fillRect(0, y + ROW_H - 1, W, 1);
+  }
+
+  // Beat grid (every second)
+  for (let s = 0; s <= duration; s++) {
+    const x = s * PX_PER_S;
+    rx.fillStyle = s % 4 === 0 ? '#45475a' : '#313244';
+    rx.fillRect(x, 0, 1, H);
+  }
+
+  // Notes
+  const palette = ['#89b4fa','#a6e3a1','#fab387','#f38ba8','#cba6f7','#94e2d5'];
+  notes.forEach(n => {
+    const y = (MIDI_MAX - n.pitch) * ROW_H;
+    const x = n.start * PX_PER_S;
+    const w = Math.max(2, (n.end - n.start) * PX_PER_S - 1);
+    rx.fillStyle = palette[n.pitch % palette.length];
+    rx.beginPath();
+    rx.roundRect(x, y + 1, w, ROW_H - 2, 2);
+    rx.fill();
+  });
+
+  document.getElementById('roll-wrap').style.display = 'block';
+}
+
 // ── State ───────────────────────────────────────────────────────────────────
 let selectedFile = null;
 let mediaRecorder = null;
@@ -261,12 +388,13 @@ async function startConvert() {
   form.append('job_id', jobId);
 
   // Start polling progress
+  let lastNotes = null;
   const pollId = setInterval(async () => {
     try {
       const r = await fetch('/progress/' + jobId);
       const d = await r.json();
       setProgress('convert', d.pct, d.msg);
-      if (d.done) clearInterval(pollId);
+      if (d.done) { clearInterval(pollId); lastNotes = d.notes || null; }
     } catch {}
   }, 400);
 
@@ -285,6 +413,8 @@ async function startConvert() {
     dl.href = url;
     dl.style.display = 'inline-flex';
     setProgress('convert', 100, '✓ Done! Click Download to save.');
+    if (lastNotes) drawPianoRoll(lastNotes);
+    loadHistory();
     // Draw piano roll from response headers isn't possible, so we'll just update msg
   } catch (e) {
     clearInterval(pollId);
@@ -360,12 +490,13 @@ async function processRecording() {
   form.append('tempo', tempo);
   form.append('job_id', jobId);
 
+  let recNotes = null;
   const pollId = setInterval(async () => {
     try {
       const r = await fetch('/progress/' + jobId);
       const d = await r.json();
       setProgress('rec', d.pct, d.msg);
-      if (d.done) clearInterval(pollId);
+      if (d.done) { clearInterval(pollId); recNotes = d.notes || null; }
     } catch {}
   }, 400);
 
@@ -383,6 +514,8 @@ async function processRecording() {
     dl.href = url;
     dl.style.display = 'inline-flex';
     setProgress('rec', 100, '✓ Done! Click Download to save.');
+    if (recNotes) drawPianoRoll(recNotes);
+    loadHistory();
   } catch (e) {
     clearInterval(pollId);
     setProgress('rec', 0, '❌ ' + e.message);

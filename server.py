@@ -7,6 +7,8 @@ import secrets
 import tempfile
 import threading
 import functools
+import datetime
+from collections import deque
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -59,6 +61,24 @@ def logout():
     return redirect(url_for("login"))
 
 
+# ── History store (last 10 conversions) ──────────────────────────────────────
+_history: deque = deque(maxlen=10)
+_history_lock = threading.Lock()
+
+
+def _add_to_history(filename: str, note_count: int, midi_bytes: bytes) -> str:
+    entry_id = secrets.token_hex(8)
+    with _history_lock:
+        _history.appendleft({
+            "id": entry_id,
+            "filename": filename,
+            "note_count": note_count,
+            "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "midi_bytes": midi_bytes,
+        })
+    return entry_id
+
+
 # ── Progress store (keyed by job_id) ─────────────────────────────────────────
 _progress: dict[str, dict] = {}
 _lock = threading.Lock()
@@ -69,9 +89,9 @@ def _set_progress(job_id: str, pct: int, msg: str):
         _progress[job_id] = {"pct": pct, "msg": msg, "done": False, "error": None}
 
 
-def _set_done(job_id: str, msg: str = "Done."):
+def _set_done(job_id: str, msg: str = "Done.", notes: list = None):
     with _lock:
-        _progress[job_id] = {"pct": 100, "msg": msg, "done": True, "error": None}
+        _progress[job_id] = {"pct": 100, "msg": msg, "done": True, "error": None, "notes": notes or []}
 
 
 def _set_error(job_id: str, err: str):
@@ -122,8 +142,16 @@ def convert():
         midi_data.write(buf)
         buf.seek(0)
 
-        _set_done(job_id, f"Converted {note_count} notes.")
-        return send_file(buf, as_attachment=True, download_name="output.mid", mimetype="audio/midi")
+        midi_bytes = buf.getvalue()
+        original_name = os.path.splitext(audio_file.filename)[0] + ".mid"
+        _add_to_history(original_name, note_count, midi_bytes)
+
+        notes_data = [
+            {"pitch": n.pitch, "start": round(n.start, 3), "end": round(n.end, 3)}
+            for inst in midi_data.instruments for n in inst.notes
+        ]
+        _set_done(job_id, f"Converted {note_count} notes.", notes=notes_data)
+        return send_file(io.BytesIO(midi_bytes), as_attachment=True, download_name=original_name, mimetype="audio/midi")
     except Exception as exc:
         _set_error(job_id, str(exc))
         return jsonify({"error": str(exc)}), 500
@@ -160,6 +188,31 @@ def detect_bpm():
             os.unlink(tmp_in.name)
         except OSError:
             pass
+
+
+@app.route("/history")
+@login_required
+def history():
+    with _history_lock:
+        entries = [{"id": e["id"], "filename": e["filename"],
+                    "note_count": e["note_count"], "created_at": e["created_at"]}
+                   for e in _history]
+    return jsonify(entries)
+
+
+@app.route("/download/<entry_id>")
+@login_required
+def download(entry_id: str):
+    with _history_lock:
+        entry = next((e for e in _history if e["id"] == entry_id), None)
+    if not entry:
+        return jsonify({"error": "Not found."}), 404
+    return send_file(
+        io.BytesIO(entry["midi_bytes"]),
+        as_attachment=True,
+        download_name=entry["filename"],
+        mimetype="audio/midi",
+    )
 
 
 @app.route("/progress/<job_id>")

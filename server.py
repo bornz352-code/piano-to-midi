@@ -5,13 +5,15 @@ import os
 import io
 import tempfile
 import threading
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import soundfile as sf
 from flask import Flask, render_template, request, send_file, jsonify, Response
 from audio.loader import load as load_audio
-from pitch.detector import detect
-from midi.builder import build as build_midi
+from basic_pitch.inference import predict as bp_predict
+from basic_pitch import ICASSP_2022_MODEL_PATH
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
@@ -61,21 +63,26 @@ def convert():
         y, sr = load_audio(tmp_in.name)
         duration = len(y) / sr
 
-        _set_progress(job_id, 20, f"Loaded {duration:.1f}s — detecting pitches…")
+        # basic-pitch needs a WAV file; write a temp one if the input isn't WAV
+        tmp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        sf.write(tmp_wav.name, y, sr)
+        tmp_wav.close()
 
-        def on_pitch_progress(p, m):
-            _set_progress(job_id, 20 + int(p * 0.6), m)
+        _set_progress(job_id, 25, f"Loaded {duration:.1f}s — transcribing (polyphonic)…")
+        _, midi_data, note_events = bp_predict(tmp_wav.name)
+        os.unlink(tmp_wav.name)
 
-        events = detect(y, sr, on_progress=on_pitch_progress)
+        # Apply the chosen tempo to the MIDI file
+        midi_data.initial_tempo = float(tempo)
 
-        _set_progress(job_id, 85, f"Building MIDI from {len(events)} note(s)…")
-        mid = build_midi(events, tempo_bpm=tempo)
+        note_count = sum(len(inst.notes) for inst in midi_data.instruments)
+        _set_progress(job_id, 90, f"Building MIDI from {note_count} note(s)…")
 
         buf = io.BytesIO()
-        mid.save(file=buf)
+        midi_data.write(buf)
         buf.seek(0)
 
-        _set_done(job_id, f"Converted {len(events)} notes.")
+        _set_done(job_id, f"Converted {note_count} notes.")
         return send_file(
             buf,
             as_attachment=True,
@@ -106,7 +113,8 @@ def detect_bpm():
         tmp_in.close()
         y, sr = load_audio(tmp_in.name)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        bpm = int(round(float(tempo)))
+        # tempo may be a 0-d array in newer librosa versions
+        bpm = int(round(float(np.atleast_1d(tempo)[0])))
         return jsonify({"bpm": bpm})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

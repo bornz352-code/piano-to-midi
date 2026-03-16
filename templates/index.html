@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Piano → MIDI</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:     #1e1e2e;
+      --panel:  #313244;
+      --border: #45475a;
+      --text:   #cdd6f4;
+      --sub:    #6c7086;
+      --accent: #89b4fa;
+      --green:  #a6e3a1;
+      --red:    #f38ba8;
+      --peach:  #fab387;
+      --radius: 10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .subtitle { color: var(--sub); margin-top: 4px; margin-bottom: 32px; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 18px; color: var(--accent); }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(137,180,250,0.05); }
+    .drop-zone input[type=file] { display: none; }
+    .drop-zone .icon { font-size: 32px; margin-bottom: 8px; }
+    .drop-zone .hint { color: var(--sub); font-size: 12px; margin-top: 4px; }
+    .drop-zone .filename { color: var(--green); font-size: 13px; margin-top: 8px; word-break: break-all; }
+
+    input[type=number] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 14px;
+      width: 90px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #11111b; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-record { background: var(--red); color: #11111b; }
+    .btn-record.active { background: var(--border); color: var(--text); }
+    .btn-download { background: var(--green); color: #11111b; display: none; }
+
+    .progress-wrap { margin-top: 18px; }
+    .progress-bar-bg {
+      background: var(--bg);
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .progress-msg { color: var(--sub); font-size: 12px; min-height: 18px; }
+
+    /* Piano roll */
+    .roll-wrap { margin-top: 18px; }
+    .roll-wrap h3 { font-size: 12px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    canvas { border-radius: 6px; display: block; width: 100%; }
+
+    /* Recording indicator */
+    .rec-dot {
+      width: 10px; height: 10px;
+      background: var(--red);
+      border-radius: 50%;
+      display: inline-block;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+    .timer { font-size: 22px; font-weight: 700; color: var(--red); text-align: center; margin: 12px 0; letter-spacing: 2px; }
+    .row { display: flex; gap: 12px; align-items: center; }
+  </style>
+</head>
+<body>
+  <h1>Piano → MIDI</h1>
+  <p class="subtitle">Convert piano audio to a MIDI file</p>
+
+  <!-- ── Convert File ─────────────────────────────────────── -->
+  <div class="card" id="convert-card">
+    <h2>Convert Audio File</h2>
+
+    <div class="field">
+      <label>Audio file (WAV, MP3, FLAC, OGG…)</label>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".wav,.mp3,.flac,.ogg,.aiff,.m4a,.mp4,.mov,.mkv,audio/*,video/*" />
+        <div class="icon">🎹</div>
+        <div>Drop file here or click to browse</div>
+        <div class="hint">Audio or video: WAV, MP3, FLAC, MP4, MOV… — monophonic piano works best</div>
+        <div class="filename" id="filename"></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field" style="margin:0">
+        <label>Tempo (BPM) <span id="bpm-status" style="color:var(--sub);font-size:11px"></span></label>
+        <input type="number" id="tempo" value="120" min="20" max="300" />
+      </div>
+      <button class="btn btn-primary" id="convert-btn" onclick="startConvert()" disabled>Convert to MIDI</button>
+      <a class="btn btn-download" id="download-btn" download="output.mid">⬇ Download MIDI</a>
+    </div>
+
+    <div class="progress-wrap" id="convert-progress" style="display:none">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="convert-bar"></div></div>
+      <div class="progress-msg" id="convert-msg"></div>
+    </div>
+
+    <div class="roll-wrap" id="roll-wrap" style="display:none">
+      <h3>Note Preview</h3>
+      <canvas id="roll" height="90"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Record & Convert ─────────────────────────────────── -->
+  <div class="card" id="record-card">
+    <h2>Record & Convert</h2>
+
+    <div class="timer" id="timer" style="display:none">0:00</div>
+
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn btn-record" id="rec-btn" onclick="toggleRecord()">⏺ Start Recording</button>
+      <div class="field" style="margin:0">
+        <label>Tempo (BPM)</label>
+        <input type="number" id="rec-tempo" value="120" min="20" max="300" />
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="rec-progress" style="display:none">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="rec-bar"></div></div>
+      <div class="progress-msg" id="rec-msg"></div>
+    </div>
+
+    <a class="btn btn-download" id="rec-download-btn" download="output.mid">⬇ Download MIDI</a>
+  </div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+let selectedFile = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let timerInterval = null;
+let recSeconds = 0;
+
+// ── File drop & select ──────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  document.getElementById('filename').textContent = f.name;
+  document.getElementById('convert-btn').disabled = false;
+  document.getElementById('download-btn').style.display = 'none';
+  document.getElementById('convert-progress').style.display = 'none';
+  document.getElementById('roll-wrap').style.display = 'none';
+  autoDetectBpm(f);
+}
+
+async function autoDetectBpm(f) {
+  const status = document.getElementById('bpm-status');
+  status.textContent = '⏳ detecting…';
+  const form = new FormData();
+  form.append('audio', f);
+  try {
+    const resp = await fetch('/detect-bpm', { method: 'POST', body: form });
+    const data = await resp.json();
+    if (data.bpm) {
+      document.getElementById('tempo').value = data.bpm;
+      status.textContent = `✓ detected: ${data.bpm}`;
+    } else {
+      status.textContent = '⚠ could not detect';
+    }
+  } catch {
+    status.textContent = '⚠ detection failed';
+  }
+}
+
+// ── Convert file ────────────────────────────────────────────────────────────
+async function startConvert() {
+  if (!selectedFile) return;
+  const jobId = 'file_' + Date.now();
+  const tempo = document.getElementById('tempo').value;
+
+  document.getElementById('convert-btn').disabled = true;
+  document.getElementById('download-btn').style.display = 'none';
+  document.getElementById('convert-progress').style.display = 'block';
+  setProgress('convert', 5, 'Uploading…');
+
+  const form = new FormData();
+  form.append('audio', selectedFile);
+  form.append('tempo', tempo);
+  form.append('job_id', jobId);
+
+  // Start polling progress
+  const pollId = setInterval(async () => {
+    try {
+      const r = await fetch('/progress/' + jobId);
+      const d = await r.json();
+      setProgress('convert', d.pct, d.msg);
+      if (d.done) clearInterval(pollId);
+    } catch {}
+  }, 400);
+
+  try {
+    const resp = await fetch('/convert', { method: 'POST', body: form });
+    clearInterval(pollId);
+    if (!resp.ok) {
+      const d = await resp.json();
+      setProgress('convert', 0, '❌ ' + (d.error || 'Conversion failed'));
+      document.getElementById('convert-btn').disabled = false;
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const dl = document.getElementById('download-btn');
+    dl.href = url;
+    dl.style.display = 'inline-flex';
+    setProgress('convert', 100, '✓ Done! Click Download to save.');
+    // Draw piano roll from response headers isn't possible, so we'll just update msg
+  } catch (e) {
+    clearInterval(pollId);
+    setProgress('convert', 0, '❌ ' + e.message);
+  } finally {
+    document.getElementById('convert-btn').disabled = false;
+  }
+}
+
+function setProgress(prefix, pct, msg) {
+  document.getElementById(prefix + '-bar').style.width = pct + '%';
+  document.getElementById(prefix + '-msg').textContent = msg;
+}
+
+// ── Record ──────────────────────────────────────────────────────────────────
+async function toggleRecord() {
+  const btn = document.getElementById('rec-btn');
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    alert('Microphone access denied: ' + e.message);
+    return;
+  }
+
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    clearInterval(timerInterval);
+    btn.textContent = '⏺ Start Recording';
+    btn.classList.remove('active');
+    document.getElementById('timer').style.display = 'none';
+    await processRecording();
+  };
+
+  mediaRecorder.start(100);
+  btn.innerHTML = '<span class="rec-dot"></span> Stop Recording';
+  btn.classList.add('active');
+  recSeconds = 0;
+  document.getElementById('timer').style.display = 'block';
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+function updateTimer() {
+  recSeconds++;
+  const m = Math.floor(recSeconds / 60);
+  const s = recSeconds % 60;
+  document.getElementById('timer').textContent = m + ':' + String(s).padStart(2, '0');
+}
+
+async function processRecording() {
+  const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+  const ext = (mediaRecorder.mimeType || '').includes('ogg') ? '.ogg' : '.webm';
+  const file = new File([blob], 'recording' + ext, { type: blob.type });
+
+  const jobId = 'rec_' + Date.now();
+  const tempo = document.getElementById('rec-tempo').value;
+
+  document.getElementById('rec-progress').style.display = 'block';
+  document.getElementById('rec-download-btn').style.display = 'none';
+  setProgress('rec', 5, 'Uploading recording…');
+
+  const form = new FormData();
+  form.append('audio', file);
+  form.append('tempo', tempo);
+  form.append('job_id', jobId);
+
+  const pollId = setInterval(async () => {
+    try {
+      const r = await fetch('/progress/' + jobId);
+      const d = await r.json();
+      setProgress('rec', d.pct, d.msg);
+      if (d.done) clearInterval(pollId);
+    } catch {}
+  }, 400);
+
+  try {
+    const resp = await fetch('/convert', { method: 'POST', body: form });
+    clearInterval(pollId);
+    if (!resp.ok) {
+      const d = await resp.json();
+      setProgress('rec', 0, '❌ ' + (d.error || 'Conversion failed'));
+      return;
+    }
+    const dlBlob = await resp.blob();
+    const url = URL.createObjectURL(dlBlob);
+    const dl = document.getElementById('rec-download-btn');
+    dl.href = url;
+    dl.style.display = 'inline-flex';
+    setProgress('rec', 100, '✓ Done! Click Download to save.');
+  } catch (e) {
+    clearInterval(pollId);
+    setProgress('rec', 0, '❌ ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

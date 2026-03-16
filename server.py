@@ -59,7 +59,7 @@ _CHORD_INTERVALS = {
 
 
 def _chord_to_notes(chord_name: str, octave: int = 4) -> list:
-    """Convert a chord name like 'Cmaj7' to MIDI note numbers."""
+    """Convert a chord name like 'Cmaj7' or 'C7b9' to MIDI note numbers."""
     m = re.match(r'^([A-G][#b]?)(.*?)(?:/[A-G][#b]?)?$', chord_name.strip())
     if not m:
         return [60, 64, 67]
@@ -69,7 +69,11 @@ def _chord_to_notes(chord_name: str, octave: int = 4) -> list:
         semitone += (1 if root_str[1] == '#' else -1)
     semitone = semitone % 12
     base = 12 * (octave + 1) + semitone  # C4 = 60
-    intervals = _CHORD_INTERVALS.get(quality, [0, 4, 7])
+    # Strip altered extensions (b9, #11, b13, etc.) — try progressively shorter quality
+    q = quality
+    while q and q not in _CHORD_INTERVALS:
+        q = re.sub(r'[#b]\d+$', '', q).rstrip('()')
+    intervals = _CHORD_INTERVALS.get(q, [0, 4, 7])
     return [base + i for i in intervals if 0 <= base + i <= 127]
 
 
@@ -477,6 +481,45 @@ def generate_chords():
         "midi_b64": base64.b64encode(midi_bytes).decode(),
         "filename": filename,
     })
+
+
+@app.route("/rebuild-midi", methods=["POST"])
+@login_required
+def rebuild_midi():
+    """Rebuild MIDI from chords list with per-chord inversions."""
+    import pretty_midi
+    data = request.get_json()
+    chords = data.get("chords", [])
+    tempo = max(20, min(300, int(data.get("tempo", 120))))
+
+    pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
+    instrument = pretty_midi.Instrument(program=0, name="Piano")
+    beats_per_second = tempo / 60.0
+    current_time = 0.0
+
+    for entry in chords:
+        chord_name = entry.get("chord", "C")
+        beats = max(1, int(entry.get("beats", 4)))
+        inversion = max(0, int(entry.get("inversion", 0)))
+        duration = beats / beats_per_second
+
+        notes = sorted(_chord_to_notes(chord_name))
+        for i in range(min(inversion, len(notes) - 1)):
+            notes.append(notes.pop(0) + 12)
+
+        for pitch in notes:
+            if 0 <= pitch <= 127:
+                instrument.notes.append(pretty_midi.Note(
+                    velocity=80, pitch=pitch,
+                    start=current_time, end=current_time + duration - 0.05,
+                ))
+        current_time += duration
+
+    pm.instruments.append(instrument)
+    buf = io.BytesIO()
+    pm.write(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="chords_updated.mid", mimetype="audio/midi")
 
 
 if __name__ == "__main__":

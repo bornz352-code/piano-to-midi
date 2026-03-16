@@ -186,10 +186,41 @@
       font-weight: 700; font-size: 13px;
       border: 1px solid rgba(255,255,255,0.08);
       flex-shrink: 0;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.15s;
+      user-select: none;
+    }
+    .chord-pill:hover { transform: translateY(-2px); }
+    .chord-pill:active { transform: scale(0.94); }
+    .chord-pill.playing {
+      transform: scale(1.08);
+      box-shadow: 0 0 0 3px currentColor, 0 4px 20px rgba(0,0,0,0.4);
+      animation: pill-pulse 0.6s ease-out forwards;
+    }
+    @keyframes pill-pulse {
+      0%   { transform: scale(1.08); }
+      100% { transform: scale(1.0); }
     }
     .chord-pill .ch-beats {
-      font-size: 9px; font-weight: 500; margin-top: 3px;
+      font-size: 9px; font-weight: 500; margin-top: 2px;
       opacity: 0.65; letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    .inv-dots {
+      display: flex; gap: 3px; margin-top: 6px;
+    }
+    .inv-dot {
+      width: 18px; height: 18px; border-radius: 5px;
+      font-size: 9px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; border: 1px solid currentColor;
+      opacity: 0.35; transition: opacity 0.12s, background 0.12s;
+      color: inherit;
+    }
+    .inv-dot:hover { opacity: 0.7; }
+    .inv-dot.active { opacity: 1; background: currentColor; color: var(--panel); }
+    .play-hint {
+      font-size: 11px; color: var(--sub); margin-top: 8px;
+      display: flex; align-items: center; gap: 5px;
     }
     /* chord quality colours */
     .cq-maj  { background: rgba(124,158,248,0.15); color: #7c9ef8; border-color: rgba(124,158,248,0.2); }
@@ -335,7 +366,7 @@
 
     <div class="action-row">
       <button class="btn btn-primary" id="gen-btn" onclick="generate()">✦ Generate Chords</button>
-      <a class="btn btn-download" id="dl-btn" style="display:none" download="chords.mid">⬇ Download MIDI</a>
+      <button class="btn btn-download" id="dl-btn" style="display:none" onclick="downloadMidi()">⬇ Download MIDI</button>
     </div>
 
     <div class="progress-wrap" id="progress-wrap" style="display:none">
@@ -358,6 +389,7 @@
   </div>
 
 <script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function stepVal(id, delta, min, max) {
   const el = document.getElementById(id);
   el.value = Math.min(max, Math.max(min, +el.value + delta));
@@ -368,10 +400,137 @@ function chordQuality(chord) {
   if (/aug|\+/.test(chord))                     return 'cq-aug';
   if (/sus/.test(chord))                         return 'cq-sus';
   if (/m[^a]|min|-/.test(chord))                 return 'cq-min';
-  if (/7$/.test(chord))                          return 'cq-dom';
+  if (/7/.test(chord))                           return 'cq-dom';
   return 'cq-maj';
 }
 
+// ── State ────────────────────────────────────────────────────────────────────
+let currentChords = []; // [{chord, beats, inversion}]
+let currentTempo  = 120;
+let currentFilename = 'chords.mid';
+
+// ── Chord → MIDI (client-side) ───────────────────────────────────────────────
+const NOTE_SEMITONES = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const CHORD_INTERVALS = {
+  '': [0,4,7], 'maj': [0,4,7], 'M': [0,4,7],
+  'm': [0,3,7], 'min': [0,3,7],
+  '5': [0,7],
+  '6': [0,4,7,9], 'm6': [0,3,7,9],
+  '7': [0,4,7,10], 'maj7': [0,4,7,11], 'M7': [0,4,7,11],
+  'm7': [0,3,7,10], 'mM7': [0,3,7,11],
+  'dim': [0,3,6], 'o': [0,3,6],
+  'dim7': [0,3,6,9], 'o7': [0,3,6,9],
+  'm7b5': [0,3,6,10], 'ø7': [0,3,6,10],
+  'aug': [0,4,8], '+': [0,4,8],
+  'sus2': [0,2,7], 'sus4': [0,5,7], 'sus': [0,5,7],
+  'add9': [0,4,7,14],
+  '9': [0,4,7,10,14], 'maj9': [0,4,7,11,14], 'm9': [0,3,7,10,14],
+  '11': [0,4,7,10,14,17],
+  '13': [0,4,7,10,14,17,21],
+};
+
+function chordNameToMidi(chordName, octave = 4) {
+  const m = chordName.trim().match(/^([A-G][#b]?)(.*?)(?:\/[A-G][#b]?)?$/);
+  if (!m) return [60, 64, 67];
+  let [, rootStr, quality] = m;
+  let semitone = NOTE_SEMITONES[rootStr[0]] ?? 0;
+  if (rootStr[1] === '#') semitone++;
+  else if (rootStr[1] === 'b') semitone--;
+  semitone = ((semitone % 12) + 12) % 12;
+  const base = 12 * (octave + 1) + semitone;
+  let q = quality;
+  while (q && !(q in CHORD_INTERVALS)) {
+    const stripped = q.replace(/[#b]\d+$/, '').replace(/[()]/g, '');
+    if (stripped === q) break;
+    q = stripped;
+  }
+  return (CHORD_INTERVALS[q] || [0,4,7]).map(i => base + i).filter(n => n >= 0 && n <= 127);
+}
+
+function applyInversion(midiNotes, inversion) {
+  const notes = [...midiNotes].sort((a, b) => a - b);
+  for (let i = 0; i < inversion; i++) notes.push(notes.shift() + 12);
+  return notes;
+}
+
+// ── Render chord pills ───────────────────────────────────────────────────────
+function renderChordPills() {
+  const viz = document.getElementById('chords-viz');
+  viz.innerHTML = currentChords.map((c, idx) => {
+    const q       = chordQuality(c.chord || '');
+    const numNotes = chordNameToMidi(c.chord).length;
+    const maxInv  = numNotes - 1;
+    const beatLabel = c.beats === 1 ? '1 beat' : c.beats + ' beats';
+    const invLabel  = ['R', '1st', '2nd', '3rd'];
+    const dots = Array.from({length: maxInv + 1}, (_, inv) =>
+      `<span class="inv-dot ${inv === c.inversion ? 'active' : ''}"
+             title="${inv === 0 ? 'Root position' : invLabel[inv] + ' inversion'}"
+             onclick="event.stopPropagation(); selectInversion(${idx}, ${inv})">${inv === 0 ? 'R' : inv}</span>`
+    ).join('');
+    return `<div class="chord-pill ${q}" data-idx="${idx}" onclick="playChordAtIndex(${idx})">
+      <span class="chord-name">${c.chord}</span>
+      <span class="ch-beats">${beatLabel}</span>
+      <div class="inv-dots">${dots}</div>
+    </div>`;
+  }).join('') + `<p class="play-hint">🎵 Click chord to play &nbsp;·&nbsp; R/1/2/3 = inversion</p>`;
+}
+
+// ── Inversion control ────────────────────────────────────────────────────────
+function selectInversion(idx, inv) {
+  currentChords[idx].inversion = inv;
+  // Update dots without full re-render
+  const pill = document.querySelector(`.chord-pill[data-idx="${idx}"]`);
+  pill.querySelectorAll('.inv-dot').forEach((d, i) => d.classList.toggle('active', i === inv));
+  playChordAtIndex(idx);
+}
+
+// ── Playback ─────────────────────────────────────────────────────────────────
+function midiToHz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+function playMidiNotes(midiNotes) {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const duration = 1.6;
+  midiNotes.forEach((midi, i) => {
+    const freq   = midiToHz(midi);
+    const master = ctx.createGain();
+    master.connect(ctx.destination);
+    const t = now + i * 0.03;
+    [[freq, 'triangle', 0.25], [freq * 2, 'sine', 0.06]].forEach(([f, type, amp]) => {
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(f, t);
+      osc.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(amp, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(amp * 0.5, t + 0.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+      osc.start(t); osc.stop(t + duration + 0.05);
+    });
+    master.gain.setValueAtTime(1, t);
+  });
+}
+
+function playChordAtIndex(idx) {
+  const c = currentChords[idx];
+  const notes = applyInversion(chordNameToMidi(c.chord), c.inversion);
+  playMidiNotes(notes);
+  const pill = document.querySelector(`.chord-pill[data-idx="${idx}"]`);
+  pill.classList.remove('playing');
+  void pill.offsetWidth;
+  pill.classList.add('playing');
+  setTimeout(() => pill.classList.remove('playing'), 700);
+}
+
+// ── Generate ─────────────────────────────────────────────────────────────────
 async function generate() {
   const btn = document.getElementById('gen-btn');
   const pw  = document.getElementById('progress-wrap');
@@ -396,31 +555,16 @@ async function generate() {
   try {
     const resp = await fetch('/generate-chords', { method: 'POST', body: form });
     const data = await resp.json();
-    if (!resp.ok) {
-      pm.textContent = '❌ ' + (data.error || 'Generation failed.');
-      return;
-    }
+    if (!resp.ok) { pm.textContent = '❌ ' + (data.error || 'Generation failed.'); return; }
 
-    // Render chord pills
-    const viz = document.getElementById('chords-viz');
-    viz.innerHTML = data.chords.map(c => {
-      const q = chordQuality(c.chord || '');
-      const beatLabel = c.beats === 1 ? '1 beat' : c.beats + ' beats';
-      return `<div class="chord-pill ${q}">
-        <span>${c.chord}</span>
-        <span class="ch-beats">${beatLabel}</span>
-      </div>`;
-    }).join('');
+    currentTempo    = +document.getElementById('tempo').value;
+    currentFilename = data.filename || 'chords.mid';
+    currentChords   = data.chords.map(c => ({ chord: c.chord, beats: c.beats, inversion: 0 }));
 
-    // Build download link from base64
-    const bytes = Uint8Array.from(atob(data.midi_b64), ch => ch.charCodeAt(0));
-    const blob = new Blob([bytes], { type: 'audio/midi' });
-    dl.href = URL.createObjectURL(blob);
-    dl.download = data.filename || 'chords.mid';
-    dl.style.display = 'inline-flex';
-
+    renderChordPills();
     res.style.display = 'block';
-    pm.textContent = `✓ Generated ${data.chords.length} chords.`;
+    dl.style.display  = 'inline-flex';
+    pm.textContent    = `✓ Generated ${data.chords.length} chords. Adjust inversions, then download.`;
     loadHistory();
   } catch (e) {
     pm.textContent = '❌ ' + e.message;
@@ -432,13 +576,38 @@ async function generate() {
   }
 }
 
+// ── Download with current inversions ─────────────────────────────────────────
+async function downloadMidi() {
+  const dl = document.getElementById('dl-btn');
+  dl.disabled = true;
+  dl.textContent = '⏳ Building…';
+  try {
+    const resp = await fetch('/rebuild-midi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chords: currentChords, tempo: currentTempo }),
+    });
+    if (!resp.ok) { alert('Failed to build MIDI.'); return; }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = currentFilename;
+    a.click();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    dl.disabled = false;
+    dl.textContent = '⬇ Download MIDI';
+  }
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
 async function loadHistory() {
   try {
     const resp = await fetch('/history');
     const entries = await resp.json();
     const card = document.getElementById('history-card');
     const body = document.getElementById('history-body');
-    // Only show chord entries (contain 'chord' in filename)
     const chordEntries = entries.filter(e => e.filename.includes('chord'));
     if (!chordEntries.length) { card.style.display = 'none'; return; }
     card.style.display = 'block';

@@ -798,6 +798,66 @@ def perc_generate():
             pass
 
 
+@app.route("/perc-midi/<job_id>/<int:idx>")
+@login_required
+def perc_midi(job_id: str, idx: int):
+    """Return a Drum Rack–compatible MIDI file for an Ableton session."""
+    import pretty_midi
+
+    # GM note numbers for standard drum rack pads (C1 = 36 in Ableton)
+    DRUM_NOTES = {
+        "kick":         36,  # C1  Bass Drum 1
+        "snare":        38,  # D1  Acoustic Snare
+        "hihat_closed": 42,  # F#1 Closed Hi-Hat
+        "hihat_open":   46,  # A#1 Open Hi-Hat
+        "clap":         39,  # D#1 Hand Clap
+    }
+    VEL = {1: 40, 2: 90, 3: 120}
+
+    with _perc_store_lock:
+        job = _perc_store.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found."}), 404
+    variations = job.get("variations", [])
+    if idx >= len(variations):
+        return jsonify({"error": "Variation not found."}), 404
+
+    var = variations[idx]
+    bpm = float(job.get("bpm", 120))
+    instruments_data = var.get("instruments", {})
+    steps = max((len(v) for v in instruments_data.values()), default=16)
+    bars = steps // 16
+
+    pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+    drums = pretty_midi.Instrument(program=0, is_drum=True, name="Drums")
+
+    sp16 = (60.0 / bpm) / 4          # seconds per 16th note
+    note_dur = sp16 * 0.9             # slightly short so notes don't bleed
+
+    for instr, pattern in instruments_data.items():
+        pitch = DRUM_NOTES.get(instr)
+        if pitch is None:
+            continue
+        for i, vel_code in enumerate(pattern[:steps]):
+            if not vel_code:
+                continue
+            vel = VEL.get(int(vel_code), 90)
+            start = i * sp16
+            drums.notes.append(
+                pretty_midi.Note(velocity=vel, pitch=pitch,
+                                 start=start, end=start + note_dur)
+            )
+
+    pm.instruments.append(drums)
+    buf = io.BytesIO()
+    pm.write(buf)
+    buf.seek(0)
+
+    safe_name = re.sub(r"[^\w\-]", "_", var.get("name", f"v{idx+1}"))
+    return send_file(buf, mimetype="audio/midi", as_attachment=True,
+                     download_name=f"perc_{safe_name}_drumrack.mid")
+
+
 @app.route("/perc-audio/<job_id>/<int:idx>")
 @login_required
 def perc_audio(job_id: str, idx: int):

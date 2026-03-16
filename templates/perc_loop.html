@@ -153,6 +153,10 @@
       background: rgba(124,158,248,0.12); border: 1px solid rgba(124,158,248,0.2);
       color: var(--blue); padding: 7px 14px;
     }
+    .btn-midi {
+      background: rgba(179,157,219,0.12); border: 1px solid rgba(179,157,219,0.2);
+      color: var(--purple); padding: 7px 14px;
+    }
 
     /* Progress */
     .progress-wrap { margin-top: 18px; }
@@ -425,6 +429,7 @@ function renderVariations(variations, jobId) {
         <div class="var-btns">
           <button class="btn btn-play" id="play-btn-${idx}" onclick="togglePlay(this, '${jobId}', ${idx})">▶ Play</button>
           <a href="/perc-audio/${jobId}/${idx}" download="perc_loop_v${idx+1}.wav" class="btn btn-dl">⬇ WAV</a>
+          <a href="/perc-midi/${jobId}/${idx}" download="perc_loop_v${idx+1}_drumrack.mid" class="btn btn-midi">⬇ MIDI</a>
         </div>
       </div>
       <div class="perc-grid" id="grid-${idx}"></div>

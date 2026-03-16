@@ -78,8 +78,10 @@
       gap: 20px;
       width: 100%; max-width: 720px;
     }
+    .tool-card.wide { grid-column: span 2; }
     @media (max-width: 560px) {
       .tools-grid { grid-template-columns: 1fr; }
+      .tool-card.wide { grid-column: span 1; }
     }
 
     .tool-card {
@@ -147,6 +149,10 @@
     }
     .card-audio  .feat-pill { color: rgba(124,158,248,0.8); border-color: rgba(124,158,248,0.2); background: rgba(124,158,248,0.08); }
     .card-chords .feat-pill { color: rgba(179,157,219,0.8); border-color: rgba(179,157,219,0.2); background: rgba(179,157,219,0.08); }
+    .card-perc::before  { background: linear-gradient(90deg, #f0a07a, #6fcf97); }
+    .icon-perc { background: linear-gradient(135deg, rgba(240,160,122,0.25), rgba(111,207,151,0.15)); }
+    .card-perc  .cta-label { color: #f0a07a; }
+    .card-perc  .feat-pill { color: rgba(240,160,122,0.8); border-color: rgba(240,160,122,0.2); background: rgba(240,160,122,0.08); }
   </style>
 </head>
 <body>
@@ -201,6 +207,28 @@
           <span class="feat-pill">Any key</span>
           <span class="feat-pill">Claude AI</span>
           <span class="feat-pill">MIDI export</span>
+        </div>
+      </div>
+      <div class="tool-cta">
+        <span class="cta-label">Open tool</span>
+        <span class="cta-arrow">→</span>
+      </div>
+    </a>
+
+    <a href="/perc-loop" class="tool-card card-perc wide">
+      <div class="tool-icon icon-perc">🥁</div>
+      <div class="tool-body">
+        <div class="tool-name">Perc Loop Generator</div>
+        <div class="tool-desc">
+          Upload any reference track — Claude AI analyzes its BPM, groove, and energy, then generates 4 matching percussion loops as WAV files with a visual 16-step grid.
+        </div>
+        <div class="features">
+          <span class="feat-pill">Sample analysis</span>
+          <span class="feat-pill">BPM match</span>
+          <span class="feat-pill">4 variations</span>
+          <span class="feat-pill">16-step grid</span>
+          <span class="feat-pill">WAV export</span>
+          <span class="feat-pill">Claude AI</span>
         </div>
       </div>
       <div class="tool-cta">

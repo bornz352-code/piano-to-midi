@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perc Loop Generator · Piano Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #22243a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --accent:  #f0a07a;
+      --green:   #6fcf97;
+      --blue:    #7c9ef8;
+      --purple:  #b39ddb;
+      --red:     #eb6f7a;
+      --r:       12px;
+    }
+    html { font-size: 14px; }
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 40% at 10% 15%, rgba(240,160,122,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 90% 80%, rgba(111,207,151,0.05) 0%, transparent 70%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 48px 16px 80px;
+    }
+
+    header {
+      width: 100%; max-width: 720px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 40px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .back-btn {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--sub); text-decoration: none; font-size: 16px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .back-btn:hover { color: var(--text); border-color: var(--border2); }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 40px; height: 40px; border-radius: 11px;
+      background: linear-gradient(135deg, #f0a07a, #6fcf97);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; box-shadow: 0 4px 16px rgba(240,160,122,0.35);
+    }
+    .logo-text h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-text p  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+    .signout {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .signout:hover { color: var(--text); border-color: var(--border2); }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+      width: 100%; max-width: 720px; margin-bottom: 14px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.7px;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .card-title::before {
+      content: ''; display: block; width: 3px; height: 14px;
+      background: var(--accent); border-radius: 2px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 1.5px dashed rgba(240,160,122,0.3);
+      border-radius: 10px; padding: 28px 20px; text-align: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+      background: rgba(240,160,122,0.03); margin-bottom: 20px;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent); background: rgba(240,160,122,0.07);
+    }
+    .drop-zone input[type=file] { display: none; }
+    .dz-icon {
+      width: 44px; height: 44px; border-radius: 12px; margin: 0 auto 12px;
+      background: linear-gradient(135deg, rgba(240,160,122,0.25), rgba(111,207,151,0.15));
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .dz-text { font-size: 14px; font-weight: 500; }
+    .dz-hint { font-size: 12px; color: var(--sub); margin-top: 4px; }
+    .dz-file {
+      margin-top: 10px; font-size: 13px; font-weight: 500; color: var(--green);
+      padding: 6px 10px; background: rgba(111,207,151,0.1); border-radius: 6px;
+      display: none; align-items: center; gap: 6px; justify-content: center;
+    }
+    .dz-file.visible { display: flex; }
+
+    /* Settings row */
+    .settings-row {
+      display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+    }
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    .field label {
+      font-size: 11px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    select {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px;
+      padding: 9px 32px 9px 12px; font-size: 13px; font-family: inherit;
+      outline: none; transition: border-color 0.15s;
+      -webkit-appearance: none; appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6d8a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    select:focus { border-color: var(--accent); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.15s, opacity 0.15s;
+      font-family: inherit; text-decoration: none; white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, #f0a07a, #d88860);
+      color: #fff; box-shadow: 0 2px 12px rgba(240,160,122,0.4);
+    }
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(240,160,122,0.55); }
+    .btn-play {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); padding: 7px 14px;
+    }
+    .btn-play.playing {
+      background: rgba(111,207,151,0.15); border-color: var(--green); color: var(--green);
+    }
+    .btn-dl {
+      background: rgba(124,158,248,0.12); border: 1px solid rgba(124,158,248,0.2);
+      color: var(--blue); padding: 7px 14px;
+    }
+
+    /* Progress */
+    .progress-wrap { margin-top: 18px; }
+    .progress-track {
+      background: var(--surface); border-radius: 99px;
+      height: 4px; overflow: hidden; margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%; border-radius: 99px; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      transition: width 0.35s ease; position: relative; overflow: hidden;
+    }
+    .progress-fill.indeterminate { width: 100%; }
+    .progress-fill::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .progress-msg { font-size: 12px; color: var(--sub); }
+
+    /* Analysis badge row */
+    .analysis-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .a-pill {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8px 14px; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      min-width: 80px;
+    }
+    .a-pill .a-val { font-size: 16px; font-weight: 700; color: var(--accent); }
+    .a-pill .a-lbl { font-size: 10px; font-weight: 600; color: var(--sub);
+                     text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+    /* Variation cards */
+    .var-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 20px;
+      width: 100%; max-width: 720px; margin-bottom: 14px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.2);
+    }
+    .var-card::before {
+      content: ''; display: block; height: 2px; border-radius: 2px;
+      margin-bottom: 18px;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+    }
+    .var-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .var-num {
+      font-size: 10px; font-weight: 700; color: var(--accent);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px;
+    }
+    .var-name { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+    .var-desc { font-size: 12px; color: var(--sub); margin-top: 3px; }
+    .var-btns { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+    /* 16-step grid */
+    .perc-grid { overflow-x: auto; padding-bottom: 4px; }
+    .perc-grid::-webkit-scrollbar { height: 3px; }
+    .perc-grid::-webkit-scrollbar-track { background: var(--surface); }
+    .perc-grid::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    .grid-row {
+      display: flex; align-items: center; gap: 5px;
+      margin-bottom: 4px; white-space: nowrap;
+    }
+    .row-label {
+      width: 52px; font-size: 9px; font-weight: 700; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      text-align: right; flex-shrink: 0;
+    }
+    .grid-steps { display: flex; gap: 2px; }
+    .step {
+      width: 15px; height: 22px; border-radius: 3px; flex-shrink: 0;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .step.beat-gap { margin-left: 4px; }
+    /* instrument colours */
+    .step.k  { background: #7c9ef8; border-color: #7c9ef8; }
+    .step.s  { background: #f07a7a; border-color: #f07a7a; }
+    .step.hc { background: #6fcf97; border-color: #6fcf97; }
+    .step.ho { background: #5bc5df; border-color: #5bc5df; }
+    .step.c  { background: #b39ddb; border-color: #b39ddb; }
+    /* velocity opacity */
+    .step.v1 { opacity: 0.32; }
+    .step.v2 { opacity: 0.68; }
+    .step.v3 { opacity: 1.0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <a href="/" class="back-btn" title="Back to home">←</a>
+    <div class="logo">
+      <div class="logo-icon">🥁</div>
+      <div class="logo-text">
+        <h1>Perc Loop Generator</h1>
+        <p>Sample-matched AI percussion</p>
+      </div>
+    </div>
+  </div>
+  <a href="/logout" class="signout">Sign out</a>
+</header>
+
+<!-- ── Settings card ─────────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-title">Reference Sample + Settings</div>
+
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" accept=".wav,.mp3,.flac,.aiff,.m4a,audio/*" />
+    <div class="dz-icon">🎵</div>
+    <div class="dz-text">Drop a sample here or click to browse</div>
+    <div class="dz-hint">WAV · MP3 · FLAC — the AI will match its feel &amp; BPM</div>
+    <div class="dz-file" id="dz-file"><span>✓</span><span id="filename"></span></div>
+  </div>
+
+  <div class="settings-row">
+    <div class="field">
+      <label>Style</label>
+      <select id="style">
+        <option value="auto-detect">Auto-detect</option>
+        <option>Trap</option>
+        <option>Boom Bap</option>
+        <option>Afrobeat</option>
+        <option>House</option>
+        <option>Jungle</option>
+        <option>Drum and Bass</option>
+        <option>R&amp;B / Soul</option>
+        <option>Lo-Fi</option>
+        <option>Funk</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Bars</label>
+      <select id="bars">
+        <option value="1">1 bar</option>
+        <option value="2" selected>2 bars</option>
+        <option value="4">4 bars</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="gen-btn" onclick="generate()" disabled>
+      ✦ Analyze &amp; Generate
+    </button>
+  </div>
+
+  <div class="progress-wrap" id="progress-wrap" style="display:none">
+    <div class="progress-track">
+      <div class="progress-fill indeterminate" id="progress-fill"></div>
+    </div>
+    <div class="progress-msg" id="progress-msg">Analyzing sample…</div>
+  </div>
+</div>
+
+<!-- ── Analysis results ───────────────────────────────────────────────────── -->
+<div class="card" id="analysis-card" style="display:none">
+  <div class="card-title">Sample Analysis</div>
+  <div class="analysis-pills" id="analysis-pills"></div>
+</div>
+
+<!-- ── Variations ─────────────────────────────────────────────────────────── -->
+<div id="variations-wrap"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let selectedFile = null;
+let currentJobId = null;
+const audioPlayers = {};
+
+const INSTR_INFO = {
+  kick:         { label: 'Kick',  cls: 'k'  },
+  snare:        { label: 'Snare', cls: 's'  },
+  hihat_closed: { label: 'HH',    cls: 'hc' },
+  hihat_open:   { label: 'HH Op', cls: 'ho' },
+  clap:         { label: 'Clap',  cls: 'c'  },
+};
+
+// ── File drop / select ───────────────────────────────────────────────────────
+const dz    = document.getElementById('drop-zone');
+const input = document.getElementById('file-input');
+
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+input.addEventListener('change', () => { if (input.files[0]) setFile(input.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  document.getElementById('filename').textContent = f.name;
+  document.getElementById('dz-file').classList.add('visible');
+  document.getElementById('gen-btn').disabled = false;
+}
+
+// ── Generate ─────────────────────────────────────────────────────────────────
+async function generate() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('gen-btn');
+  const pw  = document.getElementById('progress-wrap');
+  const pm  = document.getElementById('progress-msg');
+
+  btn.disabled = true;
+  pw.style.display = 'block';
+  pm.textContent = 'Uploading & analyzing sample…';
+  document.getElementById('analysis-card').style.display = 'none';
+  document.getElementById('variations-wrap').innerHTML = '';
+
+  const form = new FormData();
+  form.append('audio', selectedFile);
+  form.append('style', document.getElementById('style').value);
+  form.append('bars',  document.getElementById('bars').value);
+
+  try {
+    pm.textContent = 'Analyzing audio + calling Claude AI…';
+    const resp = await fetch('/perc-generate', { method: 'POST', body: form });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      pm.textContent = '❌ ' + (data.error || 'Generation failed.');
+      return;
+    }
+
+    currentJobId = data.job_id;
+    pm.textContent = `✓ Generated ${data.variations.length} patterns at ${data.analysis.bpm} BPM.`;
+    document.getElementById('progress-fill').classList.remove('indeterminate');
+    document.getElementById('progress-fill').style.width = '100%';
+
+    renderAnalysis(data.analysis, data.style);
+    renderVariations(data.variations, data.job_id);
+  } catch (e) {
+    pm.textContent = '❌ ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Render analysis pills ─────────────────────────────────────────────────────
+function renderAnalysis(a, style) {
+  const card = document.getElementById('analysis-card');
+  const pills = document.getElementById('analysis-pills');
+  card.style.display = 'block';
+  pills.innerHTML = [
+    { val: a.bpm,               lbl: 'BPM'      },
+    { val: a.groove_feel,       lbl: 'Groove'   },
+    { val: a.energy_level,      lbl: 'Energy'   },
+    { val: style,               lbl: 'Style'    },
+    { val: a.freq_character,    lbl: 'Frequency' },
+    { val: a.rhythmic_density,  lbl: 'Density'  },
+  ].map(p => `
+    <div class="a-pill">
+      <div class="a-val">${p.val}</div>
+      <div class="a-lbl">${p.lbl}</div>
+    </div>`).join('');
+}
+
+// ── Render variation cards ────────────────────────────────────────────────────
+function renderVariations(variations, jobId) {
+  const wrap = document.getElementById('variations-wrap');
+  wrap.innerHTML = variations.map((v, idx) => `
+    <div class="var-card">
+      <div class="var-num">Variation ${idx + 1}</div>
+      <div class="var-header">
+        <div>
+          <div class="var-name">${v.name || 'Pattern ' + (idx+1)}</div>
+          <div class="var-desc">${v.description || ''}</div>
+        </div>
+        <div class="var-btns">
+          <button class="btn btn-play" id="play-btn-${idx}" onclick="togglePlay(this, '${jobId}', ${idx})">▶ Play</button>
+          <a href="/perc-audio/${jobId}/${idx}" download="perc_loop_v${idx+1}.wav" class="btn btn-dl">⬇ WAV</a>
+        </div>
+      </div>
+      <div class="perc-grid" id="grid-${idx}"></div>
+    </div>`).join('');
+
+  variations.forEach((v, idx) => renderGrid(`grid-${idx}`, v.instruments));
+}
+
+// ── Render 16-step grid ───────────────────────────────────────────────────────
+function renderGrid(containerId, instruments) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const instOrder = ['kick','snare','hihat_closed','hihat_open','clap'];
+  el.innerHTML = instOrder.map(instr => {
+    const steps = instruments[instr] || [];
+    const { label, cls } = INSTR_INFO[instr] || { label: instr, cls: '' };
+    const cells = steps.map((vel, i) => {
+      const gap = (i > 0 && i % 4 === 0) ? ' beat-gap' : '';
+      if (!vel) return `<div class="step${gap}"></div>`;
+      return `<div class="step ${cls} v${vel}${gap}"></div>`;
+    }).join('');
+    return `<div class="grid-row">
+      <span class="row-label">${label}</span>
+      <div class="grid-steps">${cells}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Audio playback ────────────────────────────────────────────────────────────
+function togglePlay(btn, jobId, idx) {
+  const key = `${jobId}_${idx}`;
+
+  // Stop all other players
+  Object.entries(audioPlayers).forEach(([k, audio]) => {
+    if (k !== key) { audio.pause(); audio.currentTime = 0; }
+  });
+  document.querySelectorAll('.btn-play').forEach(b => {
+    if (b !== btn) { b.textContent = '▶ Play'; b.classList.remove('playing'); }
+  });
+
+  if (!audioPlayers[key]) {
+    audioPlayers[key] = new Audio(`/perc-audio/${jobId}/${idx}`);
+    audioPlayers[key].onended = () => {
+      btn.textContent = '▶ Play';
+      btn.classList.remove('playing');
+    };
+  }
+
+  const audio = audioPlayers[key];
+  if (audio.paused) {
+    audio.currentTime = 0;
+    audio.play();
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('playing');
+  } else {
+    audio.pause();
+    audio.currentTime = 0;
+    btn.textContent = '▶ Play';
+    btn.classList.remove('playing');
+  }
+}
+</script>
+</body>
+</html>

@@ -141,6 +141,10 @@ def _add_to_history(filename: str, note_count: int, midi_bytes: bytes) -> str:
 _progress: dict[str, dict] = {}
 _lock = threading.Lock()
 
+# ── Perc loop store (job_id → {variations, wav_cache}) ───────────────────────
+_perc_store: dict[str, dict] = {}
+_perc_store_lock = threading.Lock()
+
 
 def _set_progress(job_id: str, pct: int, msg: str):
     with _lock:
@@ -520,6 +524,283 @@ def rebuild_midi():
     pm.write(buf)
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name="chords_updated.mid", mimetype="audio/midi")
+
+
+# ── Perc loop: audio analysis ────────────────────────────────────────────────
+def _analyze_audio_for_perc(path: str) -> dict:
+    import librosa as _lr
+    y, sr = _lr.load(path, sr=22050, mono=True)
+
+    tempo, _ = _lr.beat.beat_track(y=y, sr=sr)
+    bpm = round(float(np.atleast_1d(tempo)[0]), 1)
+
+    rms = _lr.feature.rms(y=y)[0]
+    energy_mean = float(np.mean(rms))
+    energy_level = "high" if energy_mean > 0.07 else "medium" if energy_mean > 0.02 else "low"
+
+    centroid = _lr.feature.spectral_centroid(y=y, sr=sr)[0]
+    dom_freq = int(np.mean(centroid))
+    freq_char = "bright/treble" if dom_freq > 3000 else "mid-range" if dom_freq > 1000 else "bass-heavy"
+
+    onsets = _lr.onset.onset_detect(y=y, sr=sr, units="time")
+    duration = len(y) / sr
+    density = round(len(onsets) / max(duration, 0.1), 2)
+
+    groove = "straight"
+    if len(onsets) > 6:
+        ioi = np.diff(onsets)
+        if len(ioi) >= 4:
+            p60 = np.percentile(ioi, 60)
+            short_ioi = ioi[ioi < p60]
+            long_ioi  = ioi[ioi >= p60]
+            if len(short_ioi) > 0 and len(long_ioi) > 0:
+                ratio = float(np.mean(long_ioi)) / (float(np.mean(short_ioi)) + 1e-8)
+                groove = "swung" if ratio > 1.4 else "straight"
+
+    return {
+        "bpm": bpm,
+        "energy_level": energy_level,
+        "groove_feel": groove,
+        "dominant_freq_hz": dom_freq,
+        "freq_character": freq_char,
+        "rhythmic_density": density,
+        "duration_s": round(duration, 2),
+    }
+
+
+def _auto_style(analysis: dict) -> str:
+    bpm = analysis["bpm"]
+    if bpm < 85:   return "boom bap"
+    if bpm < 100:  return "boom bap / lo-fi"
+    if bpm < 115:  return "R&B / neo soul"
+    if bpm < 128:  return "afrobeat"
+    if bpm < 140:  return "house"
+    if bpm < 160:  return "trap"
+    if bpm < 175:  return "jungle"
+    return "drum and bass"
+
+
+def _build_perc_prompt(analysis: dict, style: str, bars: int) -> str:
+    steps = 16 * bars
+    groove_note = (
+        "Use syncopation, swing feel, and 'behind the beat' placement"
+        if analysis["groove_feel"] == "swung"
+        else "Keep patterns tight to the grid, straight time"
+    )
+    density_note = (
+        "dense, driving, lots of activity" if analysis["energy_level"] == "high"
+        else "moderate complexity, balanced" if analysis["energy_level"] == "medium"
+        else "sparse and minimal"
+    )
+    return (
+        f"You are an expert music producer. I analyzed a reference audio track:\n"
+        f"BPM: {analysis['bpm']}\n"
+        f"Energy: {analysis['energy_level']}\n"
+        f"Groove: {analysis['groove_feel']}\n"
+        f"Frequency character: {analysis['freq_character']} ({analysis['dominant_freq_hz']}Hz spectral centroid)\n"
+        f"Rhythmic density: {analysis['rhythmic_density']} onsets/sec\n"
+        f"Style: {style}\n"
+        f"Bars: {bars} ({steps} 16th-note steps per instrument)\n\n"
+        f"Generate exactly 4 unique percussion loop variations that COMPLEMENT this track.\n"
+        f"Rules:\n"
+        f"- Match BPM exactly: {analysis['bpm']}\n"
+        f"- Groove: {groove_note}\n"
+        f"- Energy: {density_note}\n"
+        f"- Each variation must have a clearly distinct character\n\n"
+        f"Velocity codes: 0=silent, 1=ghost note (soft), 2=normal hit, 3=accent (loud)\n\n"
+        f"Return ONLY valid JSON in this exact format (no markdown, no explanation):\n"
+        '{{\n  "variations": [\n    {{\n'
+        '      "name": "Short creative name",\n'
+        '      "description": "One sentence about the groove",\n'
+        '      "instruments": {{\n'
+        f'        "kick":         [exactly {steps} integers 0-3],\n'
+        f'        "snare":        [exactly {steps} integers 0-3],\n'
+        f'        "hihat_closed": [exactly {steps} integers 0-3],\n'
+        f'        "hihat_open":   [exactly {steps} integers 0-3],\n'
+        f'        "clap":         [exactly {steps} integers 0-3]\n'
+        '      }}\n    }}\n  ]\n}}\n'
+        "Generate exactly 4 variations."
+    )
+
+
+# ── Perc loop: drum synthesis ─────────────────────────────────────────────────
+_PERC_SR = 44100
+
+
+def _synth_kick(velocity=1.0):
+    sr, dur = _PERC_SR, 0.55
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    freq = 150 * np.exp(-t * 22) + 42
+    phase = np.cumsum(2 * np.pi * freq / sr)
+    tone = np.sin(phase) * np.exp(-t * 9)
+    click = np.random.randn(len(t)) * np.exp(-t * 250) * 0.15
+    return np.clip((tone + click) * velocity, -1.0, 1.0)
+
+
+def _synth_snare(velocity=1.0):
+    from scipy.signal import sosfilt, butter
+    sr, dur = _PERC_SR, 0.22
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    noise = np.random.randn(len(t)) * np.exp(-t * 20)
+    tone = np.sin(2 * np.pi * 200 * t) * np.exp(-t * 30) * 0.35
+    sos = butter(2, 300 / (sr / 2), btype="high", output="sos")
+    return np.clip((sosfilt(sos, noise) + tone) * velocity * 0.75, -1.0, 1.0)
+
+
+def _synth_hihat_closed(velocity=1.0):
+    from scipy.signal import sosfilt, butter
+    sr, dur = _PERC_SR, 0.07
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    noise = np.random.randn(len(t)) * np.exp(-t * 100)
+    sos = butter(2, 7000 / (sr / 2), btype="high", output="sos")
+    return np.clip(sosfilt(sos, noise) * velocity * 0.55, -1.0, 1.0)
+
+
+def _synth_hihat_open(velocity=1.0):
+    from scipy.signal import sosfilt, butter
+    sr, dur = _PERC_SR, 0.38
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    noise = np.random.randn(len(t)) * np.exp(-t * 7)
+    sos = butter(2, 6000 / (sr / 2), btype="high", output="sos")
+    return np.clip(sosfilt(sos, noise) * velocity * 0.45, -1.0, 1.0)
+
+
+def _synth_clap(velocity=1.0):
+    from scipy.signal import sosfilt, butter
+    sr, dur = _PERC_SR, 0.20
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    env = (np.exp(-t * 80)
+           + 0.6 * np.exp(-((t - 0.008) ** 2) * 80000)
+           + 0.4 * np.exp(-((t - 0.016) ** 2) * 80000))
+    noise = np.random.randn(len(t))
+    sos = butter(2, 1000 / (sr / 2), btype="high", output="sos")
+    return np.clip(sosfilt(sos, noise * env) * velocity * 0.65, -1.0, 1.0)
+
+
+_DRUM_SYNTHS = {
+    "kick":         _synth_kick,
+    "snare":        _synth_snare,
+    "hihat_closed": _synth_hihat_closed,
+    "hihat_open":   _synth_hihat_open,
+    "clap":         _synth_clap,
+}
+_VEL_MAP = {1: 0.38, 2: 0.70, 3: 1.0}
+
+
+def _pattern_to_wav_bytes(instruments: dict, bpm: float, bars: int) -> bytes:
+    sr = _PERC_SR
+    sp16 = (60.0 / bpm) / 4          # seconds per 16th note
+    steps = 16 * bars
+    total = int((steps * sp16 + 1.2) * sr)
+    mix = np.zeros(total, dtype=np.float64)
+
+    for instr, pattern in instruments.items():
+        fn = _DRUM_SYNTHS.get(instr)
+        if not fn:
+            continue
+        for i, vel_code in enumerate(pattern[:steps]):
+            if not vel_code:
+                continue
+            vel = _VEL_MAP.get(int(vel_code), 0.70)
+            hit = fn(vel)
+            s = int(i * sp16 * sr)
+            e = min(s + len(hit), total)
+            mix[s:e] += hit[: e - s]
+
+    peak = np.max(np.abs(mix))
+    if peak > 1e-6:
+        mix = mix / peak * 0.92
+
+    buf = io.BytesIO()
+    sf.write(buf, (np.clip(mix, -1, 1) * 32767).astype(np.int16), sr,
+             format="WAV", subtype="PCM_16")
+    buf.seek(0)
+    return buf.getvalue()
+
+
+# ── Perc loop routes ──────────────────────────────────────────────────────────
+@app.route("/perc-loop")
+@login_required
+def perc_loop():
+    return render_template("perc_loop.html")
+
+
+@app.route("/perc-generate", methods=["POST"])
+@login_required
+def perc_generate():
+    import anthropic
+
+    audio_file = request.files.get("audio")
+    style = request.form.get("style", "auto-detect")
+    bars = max(1, min(4, int(request.form.get("bars", 2))))
+
+    if not audio_file or not audio_file.filename:
+        return jsonify({"error": "No audio file provided."}), 400
+
+    ext = os.path.splitext(audio_file.filename)[1] or ".wav"
+    tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+    try:
+        audio_file.save(tmp.name)
+        tmp.close()
+
+        analysis = _analyze_audio_for_perc(tmp.name)
+        if style == "auto-detect":
+            style = _auto_style(analysis)
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
+
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": _build_perc_prompt(analysis, style, bars)}],
+        )
+        text = msg.content[0].text.strip()
+        match = re.search(r"\{[\s\S]*\}", text)
+        if not match:
+            return jsonify({"error": "Could not parse patterns from Claude."}), 500
+        variations = json.loads(match.group()).get("variations", [])[:4]
+
+        wav_cache = {}
+        for idx, var in enumerate(variations):
+            wav_cache[idx] = _pattern_to_wav_bytes(
+                var.get("instruments", {}), analysis["bpm"], bars
+            )
+
+        job_id = secrets.token_hex(8)
+        with _perc_store_lock:
+            if len(_perc_store) >= 20:
+                del _perc_store[next(iter(_perc_store))]
+            _perc_store[job_id] = {"variations": variations, "wav_cache": wav_cache}
+
+        return jsonify({"job_id": job_id, "analysis": analysis, "style": style,
+                        "variations": variations})
+
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+
+@app.route("/perc-audio/<job_id>/<int:idx>")
+@login_required
+def perc_audio(job_id: str, idx: int):
+    with _perc_store_lock:
+        job = _perc_store.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found."}), 404
+    wav = job["wav_cache"].get(idx)
+    if wav is None:
+        return jsonify({"error": "Variation not found."}), 404
+    return send_file(
+        io.BytesIO(wav), mimetype="audio/wav",
+        as_attachment=False, download_name=f"perc_loop_v{idx + 1}.wav",
+    )
 
 
 if __name__ == "__main__":

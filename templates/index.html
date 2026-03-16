@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Piano → MIDI</title>
+  <title>Audio → MIDI · STUDIO AID</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --bg:      #0f0f1a;
       --surface: #1a1b2e;
-      --panel:   #22243a;
-      --border:  rgba(255,255,255,0.08);
-      --border2: rgba(255,255,255,0.12);
+      --panel:   #1e2035;
+      --border:  rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.15);
       --text:    #e2e4f0;
       --sub:     #6b6d8a;
       --accent:  #7c9ef8;
@@ -23,7 +23,10 @@
       --red:     #eb6f7a;
       --peach:   #f0a07a;
       --purple:  #b39ddb;
-      --r:       12px;
+      --brand:   #a259ff;
+      --cyan:    #00d4ff;
+      --grad:    linear-gradient(135deg, #a259ff, #00d4ff);
+      --r:       14px;
     }
 
     html { font-size: 14px; }
@@ -31,8 +34,8 @@
     body {
       background: var(--bg);
       background-image:
-        radial-gradient(ellipse 60% 40% at 15% 20%, rgba(124,158,248,0.07) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 50% at 85% 80%, rgba(111,207,151,0.05) 0%, transparent 70%);
+        radial-gradient(ellipse 70% 50% at 10% 10%, rgba(162,89,255,0.1) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 60% at 90% 85%, rgba(0,212,255,0.07) 0%, transparent 65%);
       color: var(--text);
       font-family: "Inter", system-ui, sans-serif;
       min-height: 100vh;
@@ -46,21 +49,33 @@
     header {
       width: 100%; max-width: 660px;
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 40px;
+      padding-top: 28px; margin-bottom: 0;
     }
-    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo { display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
     .logo-icon {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: linear-gradient(135deg, #7c9ef8, #6fcf97);
+      width: 44px; height: 44px; border-radius: 13px;
+      background: linear-gradient(135deg, #a259ff, #00d4ff);
       display: flex; align-items: center; justify-content: center;
-      font-size: 22px; box-shadow: 0 4px 16px rgba(124,158,248,0.35);
+      font-size: 22px; box-shadow: 0 4px 20px rgba(162,89,255,0.4);
+      flex-shrink: 0;
     }
-    .logo-text h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
-    .logo-text p { font-size: 12px; color: var(--sub); margin-top: 1px; }
+    .logo-text .brand-name {
+      font-size: 20px; font-weight: 900; letter-spacing: -0.4px;
+      background: linear-gradient(135deg, #a259ff, #00d4ff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      line-height: 1;
+    }
+    .logo-text .brand-by { font-size: 10px; font-weight: 600; color: var(--sub); letter-spacing: 1.3px; text-transform: uppercase; margin-top: 2px; }
+    .header-bar {
+      width: 100%; max-width: 660px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(162,89,255,0.4), rgba(0,212,255,0.3), transparent);
+      margin: 16px 0 36px;
+    }
     .signout {
       font-size: 12px; color: var(--sub); text-decoration: none;
-      padding: 6px 12px; border: 1px solid var(--border);
-      border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+      padding: 7px 14px; border: 1px solid var(--border);
+      border-radius: 8px; transition: color 0.15s, border-color 0.15s; font-weight: 500;
     }
     .signout:hover { color: var(--text); border-color: var(--border2); }
 
@@ -69,10 +84,10 @@
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 24px;
+      padding: 28px;
       width: 100%; max-width: 660px;
-      margin-bottom: 14px;
-      box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+      margin-bottom: 16px;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.3);
     }
     .card-title {
       font-size: 13px; font-weight: 600; color: var(--sub);
@@ -162,7 +177,7 @@
     /* ── Buttons ────────────────────────────────────────── */
     .btn {
       display: inline-flex; align-items: center; gap: 7px;
-      padding: 9px 20px; border: none; border-radius: 8px;
+      padding: 10px 22px; border: none; border-radius: 10px;
       font-size: 13px; font-weight: 600; cursor: pointer;
       transition: transform 0.1s, box-shadow 0.15s, opacity 0.15s;
       text-decoration: none; white-space: nowrap;
@@ -170,11 +185,11 @@
     .btn:active { transform: scale(0.97); }
     .btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .btn-primary {
-      background: linear-gradient(135deg, #7c9ef8, #6a8de8);
+      background: linear-gradient(135deg, #a259ff, #00d4ff);
       color: #fff;
-      box-shadow: 0 2px 12px rgba(124,158,248,0.35);
+      box-shadow: 0 3px 16px rgba(162,89,255,0.4);
     }
-    .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(124,158,248,0.5); }
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 5px 24px rgba(162,89,255,0.6); }
     .btn-record {
       background: linear-gradient(135deg, #eb6f7a, #d9606a);
       color: #fff;
@@ -285,15 +300,16 @@
 <body>
 
   <header>
-    <div class="logo">
-      <div class="logo-icon">🎹</div>
+    <a href="/" class="logo">
+      <div class="logo-icon">🎛️</div>
       <div class="logo-text">
-        <h1>Piano → MIDI</h1>
-        <p>Polyphonic audio transcription</p>
+        <div class="brand-name">STUDIO AID</div>
+        <div class="brand-by">by BORNZ</div>
       </div>
-    </div>
+    </a>
     <a href="/logout" class="signout">Sign out</a>
   </header>
+  <div class="header-bar"></div>
 
   <!-- ── Main convert card ─────────────────────────────── -->
   <div class="card">

@@ -3,74 +3,89 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Piano → MIDI · Sign in</title>
+  <title>STUDIO AID · Sign in</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #0f0f1a; --panel: #1a1b2e; --border: rgba(255,255,255,0.08);
-      --text: #e2e4f0; --sub: #6b6d8a; --accent: #7c9ef8; --red: #eb6f7a;
+      --border2: rgba(255,255,255,0.16); --text: #e2e4f0; --sub: #6b6d8a;
+      --accent: #a259ff; --cyan: #00d4ff; --red: #eb6f7a;
+      --grad: linear-gradient(135deg, #a259ff, #00d4ff);
     }
     body {
       background: var(--bg);
       background-image:
-        radial-gradient(ellipse 60% 50% at 30% 30%, rgba(124,158,248,0.08) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 60% at 70% 70%, rgba(111,207,151,0.05) 0%, transparent 70%);
+        radial-gradient(ellipse 70% 60% at 20% 20%, rgba(162,89,255,0.12) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 70% at 80% 80%, rgba(0,212,255,0.08) 0%, transparent 65%);
       color: var(--text);
       font-family: "Inter", system-ui, sans-serif; font-size: 14px;
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
     }
     .card {
-      background: rgba(26,27,46,0.9);
+      background: rgba(26,27,46,0.92);
       border: 1px solid var(--border);
-      border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 360px;
+      border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 380px;
       text-align: center;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-      backdrop-filter: blur(20px);
+      box-shadow: 0 12px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(162,89,255,0.08);
+      backdrop-filter: blur(24px);
     }
     .logo-icon {
-      width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 18px;
-      background: linear-gradient(135deg, #7c9ef8, #6fcf97);
+      width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 20px;
+      background: var(--grad);
       display: flex; align-items: center; justify-content: center;
-      font-size: 26px; box-shadow: 0 4px 20px rgba(124,158,248,0.4);
+      font-size: 30px;
+      box-shadow: 0 6px 32px rgba(162,89,255,0.45);
     }
-    h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
-    .sub { color: var(--sub); font-size: 13px; margin-top: 4px; margin-bottom: 28px; }
+    .brand-name {
+      font-size: 28px; font-weight: 900; letter-spacing: -0.5px;
+      background: var(--grad);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      line-height: 1;
+    }
+    .brand-by {
+      font-size: 11px; font-weight: 600; color: var(--sub);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      margin-top: 4px; margin-bottom: 28px;
+    }
     label {
       display: block; text-align: left; font-size: 11px; font-weight: 600;
       color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px;
     }
     input[type=password] {
       width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); padding: 11px 14px;
-      font-size: 14px; margin-bottom: 16px; outline: none; font-family: inherit;
-      transition: border-color 0.2s;
+      border-radius: 10px; color: var(--text); padding: 13px 16px;
+      font-size: 14px; margin-bottom: 18px; outline: none; font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    input[type=password]:focus { border-color: var(--accent); }
+    input[type=password]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(162,89,255,0.15);
+    }
     button {
       width: 100%;
-      background: linear-gradient(135deg, #7c9ef8, #6a8de8);
-      color: #fff; border: none; border-radius: 8px;
-      padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 14px rgba(124,158,248,0.4);
+      background: var(--grad);
+      color: #fff; border: none; border-radius: 10px;
+      padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(162,89,255,0.4);
       transition: box-shadow 0.15s, transform 0.1s;
-      font-family: inherit;
+      font-family: inherit; letter-spacing: 0.3px;
     }
-    button:hover { box-shadow: 0 4px 22px rgba(124,158,248,0.55); }
+    button:hover { box-shadow: 0 6px 28px rgba(162,89,255,0.6); }
     button:active { transform: scale(0.98); }
     .error {
-      color: var(--red); font-size: 12px; margin-bottom: 14px;
-      padding: 8px 10px; background: rgba(235,111,122,0.1);
-      border: 1px solid rgba(235,111,122,0.2); border-radius: 7px;
+      color: var(--red); font-size: 12px; margin-bottom: 16px;
+      padding: 9px 12px; background: rgba(235,111,122,0.1);
+      border: 1px solid rgba(235,111,122,0.2); border-radius: 8px;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo-icon">🎹</div>
-    <h1>Piano → MIDI</h1>
-    <p class="sub">Sign in to continue</p>
+    <div class="logo-icon">🎛️</div>
+    <div class="brand-name">STUDIO AID</div>
+    <div class="brand-by">by BORNZ</div>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <form method="post">
       <label for="password">Password</label>

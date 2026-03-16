@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Piano Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #22243a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --accent:  #7c9ef8;
+      --green:   #6fcf97;
+      --purple:  #b39ddb;
+      --peach:   #f0a07a;
+      --r:       14px;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 40% at 15% 20%, rgba(124,158,248,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 85% 80%, rgba(179,157,219,0.06) 0%, transparent 70%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 56px 16px 80px;
+    }
+
+    header {
+      width: 100%; max-width: 720px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 56px;
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      background: linear-gradient(135deg, #7c9ef8, #b39ddb);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; box-shadow: 0 4px 20px rgba(124,158,248,0.4);
+    }
+    .logo-text h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+    .logo-text p  { font-size: 12px; color: var(--sub); margin-top: 2px; }
+    .signout {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+    }
+    .signout:hover { color: var(--text); border-color: var(--border2); }
+
+    .tagline {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .tagline h2 {
+      font-size: 32px; font-weight: 700; letter-spacing: -0.6px;
+      background: linear-gradient(135deg, var(--text) 30%, var(--sub));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .tagline p { font-size: 15px; color: var(--sub); margin-top: 8px; }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      width: 100%; max-width: 720px;
+    }
+    @media (max-width: 560px) {
+      .tools-grid { grid-template-columns: 1fr; }
+    }
+
+    .tool-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 28px 24px;
+      text-decoration: none;
+      color: var(--text);
+      display: flex; flex-direction: column; gap: 16px;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.2);
+      position: relative; overflow: hidden;
+    }
+    .tool-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    }
+    .tool-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .tool-card:hover::before { opacity: 1; }
+    .card-audio::before  { background: linear-gradient(90deg, #7c9ef8, #6fcf97); }
+    .card-chords::before { background: linear-gradient(90deg, #b39ddb, #f0a07a); }
+
+    .tool-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; flex-shrink: 0;
+    }
+    .icon-audio  { background: linear-gradient(135deg, rgba(124,158,248,0.25), rgba(111,207,151,0.15)); }
+    .icon-chords { background: linear-gradient(135deg, rgba(179,157,219,0.25), rgba(240,160,122,0.15)); }
+
+    .tool-body { flex: 1; }
+    .tool-name {
+      font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+      margin-bottom: 6px;
+    }
+    .tool-desc { font-size: 13px; color: var(--sub); line-height: 1.55; }
+
+    .tool-cta {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 4px;
+    }
+    .cta-label {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .card-audio  .cta-label { color: var(--accent); }
+    .card-chords .cta-label { color: var(--purple); }
+    .cta-arrow { font-size: 16px; transition: transform 0.15s; }
+    .tool-card:hover .cta-arrow { transform: translateX(4px); }
+
+    .features {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-top: 12px;
+    }
+    .feat-pill {
+      font-size: 11px; font-weight: 500;
+      padding: 3px 8px; border-radius: 99px;
+      border: 1px solid;
+    }
+    .card-audio  .feat-pill { color: rgba(124,158,248,0.8); border-color: rgba(124,158,248,0.2); background: rgba(124,158,248,0.08); }
+    .card-chords .feat-pill { color: rgba(179,157,219,0.8); border-color: rgba(179,157,219,0.2); background: rgba(179,157,219,0.08); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎹</div>
+      <div class="logo-text">
+        <h1>Piano Studio</h1>
+        <p>Your AI music toolkit</p>
+      </div>
+    </div>
+    <a href="/logout" class="signout">Sign out</a>
+  </header>
+
+  <div class="tagline">
+    <h2>What would you like to create?</h2>
+    <p>Choose a tool to get started</p>
+  </div>
+
+  <div class="tools-grid">
+
+    <a href="/audio-to-midi" class="tool-card card-audio">
+      <div class="tool-icon icon-audio">🎵</div>
+      <div class="tool-body">
+        <div class="tool-name">Audio → MIDI</div>
+        <div class="tool-desc">
+          Convert any audio or video file into a polyphonic MIDI file using Spotify's Basic Pitch AI.
+        </div>
+        <div class="features">
+          <span class="feat-pill">Upload file</span>
+          <span class="feat-pill">Paste URL</span>
+          <span class="feat-pill">Record mic</span>
+          <span class="feat-pill">BPM detect</span>
+        </div>
+      </div>
+      <div class="tool-cta">
+        <span class="cta-label">Open tool</span>
+        <span class="cta-arrow">→</span>
+      </div>
+    </a>
+
+    <a href="/chord-generator" class="tool-card card-chords">
+      <div class="tool-icon icon-chords">🎸</div>
+      <div class="tool-body">
+        <div class="tool-name">Chord Generator</div>
+        <div class="tool-desc">
+          Generate chord progressions with Claude AI. Pick a genre, mood, and key — get a MIDI file instantly.
+        </div>
+        <div class="features">
+          <span class="feat-pill">Genre & mood</span>
+          <span class="feat-pill">Any key</span>
+          <span class="feat-pill">Claude AI</span>
+          <span class="feat-pill">MIDI export</span>
+        </div>
+      </div>
+      <div class="tool-cta">
+        <span class="cta-label">Open tool</span>
+        <span class="cta-arrow">→</span>
+      </div>
+    </a>
+
+  </div>
+
+</body>
+</html>

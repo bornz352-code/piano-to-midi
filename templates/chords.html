@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chord Generator · Piano Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #22243a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --accent:  #b39ddb;
+      --accent2: #c9b8e8;
+      --green:   #6fcf97;
+      --red:     #eb6f7a;
+      --peach:   #f0a07a;
+      --blue:    #7c9ef8;
+      --r:       12px;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(179,157,219,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 80% 85%, rgba(240,160,122,0.05) 0%, transparent 70%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 48px 16px 80px;
+    }
+
+    header {
+      width: 100%; max-width: 680px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 40px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .back-btn {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--sub); text-decoration: none; font-size: 16px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .back-btn:hover { color: var(--text); border-color: var(--border2); }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 40px; height: 40px; border-radius: 11px;
+      background: linear-gradient(135deg, #b39ddb, #f0a07a);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; box-shadow: 0 4px 16px rgba(179,157,219,0.35);
+    }
+    .logo-text h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-text p  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+    .signout {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+    }
+    .signout:hover { color: var(--text); border-color: var(--border2); }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+      width: 100%; max-width: 680px; margin-bottom: 14px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.7px;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .card-title::before {
+      content: ''; display: block; width: 3px; height: 14px;
+      background: var(--accent); border-radius: 2px;
+    }
+
+    /* Form grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    .field label {
+      font-size: 11px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    select, input[type=number] {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px;
+      padding: 9px 12px; font-size: 13px; font-family: inherit;
+      outline: none; transition: border-color 0.15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6d8a' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px; }
+    select:focus, input[type=number]:focus { border-color: var(--accent); }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* Key row */
+    .key-row { display: flex; gap: 8px; }
+    .key-row select:first-child { flex: 2; }
+    .key-row select:last-child  { flex: 3; }
+
+    /* Bars + BPM row */
+    .num-row { display: flex; align-items: center; gap: 0; }
+    .num-row button {
+      width: 32px; height: 36px; background: var(--surface);
+      border: 1px solid var(--border); color: var(--text);
+      font-size: 16px; cursor: pointer; transition: background 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .num-row button:first-child { border-radius: 8px 0 0 8px; border-right: none; }
+    .num-row button:last-child  { border-radius: 0 8px 8px 0; border-left: none; }
+    .num-row button:hover { background: var(--panel); }
+    .num-row input {
+      flex: 1; height: 36px; border-radius: 0;
+      text-align: center; font-weight: 600;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 22px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.15s, opacity 0.15s;
+      font-family: inherit;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, #b39ddb, #9b84d4);
+      color: #fff; box-shadow: 0 2px 12px rgba(179,157,219,0.4);
+    }
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(179,157,219,0.55); }
+    .btn-download {
+      background: linear-gradient(135deg, #6fcf97, #5ab87f);
+      color: #fff; box-shadow: 0 2px 12px rgba(111,207,151,0.3);
+    }
+
+    .action-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+
+    /* Progress */
+    .progress-wrap { margin-top: 16px; }
+    .progress-track {
+      background: var(--surface); border-radius: 99px;
+      height: 4px; overflow: hidden; margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%; border-radius: 99px; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--peach));
+      transition: width 0.35s ease; position: relative; overflow: hidden;
+    }
+    .progress-fill.indeterminate { width: 100%; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .progress-fill::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shimmer 1.5s infinite;
+    }
+    .progress-msg { font-size: 12px; color: var(--sub); min-height: 16px; }
+
+    /* Chord visualization */
+    .chords-viz {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .chord-pill {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-radius: 8px; padding: 8px 10px; min-width: 52px;
+      font-weight: 700; font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .chord-pill .ch-beats {
+      font-size: 9px; font-weight: 500; margin-top: 3px;
+      opacity: 0.65; letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    /* chord quality colours */
+    .cq-maj  { background: rgba(124,158,248,0.15); color: #7c9ef8; border-color: rgba(124,158,248,0.2); }
+    .cq-min  { background: rgba(179,157,219,0.15); color: #b39ddb; border-color: rgba(179,157,219,0.2); }
+    .cq-dom  { background: rgba(240,160,122,0.15); color: #f0a07a; border-color: rgba(240,160,122,0.2); }
+    .cq-dim  { background: rgba(235,111,122,0.12); color: #eb6f7a; border-color: rgba(235,111,122,0.2); }
+    .cq-aug  { background: rgba(111,207,151,0.12); color: #6fcf97; border-color: rgba(111,207,151,0.2); }
+    .cq-sus  { background: rgba(255,255,255,0.06); color: #a0a2b8; border-color: rgba(255,255,255,0.1); }
+
+    /* History */
+    .history-list { display: flex; flex-direction: column; gap: 8px; }
+    .history-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      transition: border-color 0.15s;
+    }
+    .history-item:hover { border-color: var(--border2); }
+    .history-icon {
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(179,157,219,0.2), rgba(240,160,122,0.15));
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .history-info { flex: 1; min-width: 0; }
+    .history-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-meta { font-size: 11px; color: var(--sub); margin-top: 2px; }
+    .history-dl {
+      padding: 5px 10px; font-size: 12px;
+      background: rgba(111,207,151,0.12); color: var(--green);
+      border: 1px solid rgba(111,207,151,0.2); border-radius: 6px;
+      text-decoration: none; font-weight: 600; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .history-dl:hover { background: rgba(111,207,151,0.22); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <a href="/" class="back-btn" title="Back to home">←</a>
+      <div class="logo">
+        <div class="logo-icon">🎸</div>
+        <div class="logo-text">
+          <h1>Chord Generator</h1>
+          <p>AI-powered chord progressions</p>
+        </div>
+      </div>
+    </div>
+    <a href="/logout" class="signout">Sign out</a>
+  </header>
+
+  <!-- ── Generator card ─────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Settings</div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Genre</label>
+        <select id="genre">
+          <option>Jazz</option>
+          <option>Classical</option>
+          <option>Pop</option>
+          <option>Rock</option>
+          <option>Blues</option>
+          <option>R&amp;B / Soul</option>
+          <option>Electronic</option>
+          <option>Folk / Acoustic</option>
+          <option>Bossa Nova</option>
+          <option>Latin</option>
+          <option>Funk</option>
+          <option>Gospel</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Mood</label>
+        <select id="mood">
+          <option>Happy</option>
+          <option>Sad</option>
+          <option>Melancholic</option>
+          <option>Tense</option>
+          <option>Relaxed</option>
+          <option>Energetic</option>
+          <option>Romantic</option>
+          <option>Mysterious</option>
+          <option>Uplifting</option>
+          <option>Dark</option>
+          <option>Playful</option>
+          <option>Dramatic</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Key</label>
+        <div class="key-row">
+          <select id="key">
+            <option>C</option>
+            <option>C#</option>
+            <option>D</option>
+            <option>D#</option>
+            <option>E</option>
+            <option>F</option>
+            <option>F#</option>
+            <option>G</option>
+            <option>G#</option>
+            <option>A</option>
+            <option>A#</option>
+            <option>B</option>
+          </select>
+          <select id="scale">
+            <option>Major</option>
+            <option>Minor</option>
+            <option>Dorian</option>
+            <option>Mixolydian</option>
+            <option>Lydian</option>
+            <option>Phrygian</option>
+            <option>Pentatonic Major</option>
+            <option>Pentatonic Minor</option>
+            <option>Blues</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Bars</label>
+        <div class="num-row">
+          <button onclick="stepVal('bars', -1, 1, 32)">−</button>
+          <input type="number" id="bars" value="4" min="1" max="32" />
+          <button onclick="stepVal('bars',  1, 1, 32)">+</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Tempo (BPM)</label>
+        <div class="num-row">
+          <button onclick="stepVal('tempo', -5, 20, 300)">−</button>
+          <input type="number" id="tempo" value="120" min="20" max="300" />
+          <button onclick="stepVal('tempo',  5, 20, 300)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-primary" id="gen-btn" onclick="generate()">✦ Generate Chords</button>
+      <a class="btn btn-download" id="dl-btn" style="display:none" download="chords.mid">⬇ Download MIDI</a>
+    </div>
+
+    <div class="progress-wrap" id="progress-wrap" style="display:none">
+      <div class="progress-track">
+        <div class="progress-fill indeterminate" id="progress-fill"></div>
+      </div>
+      <div class="progress-msg" id="progress-msg">Generating with Claude AI…</div>
+    </div>
+
+    <div id="chords-result" style="display:none; margin-top:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">Chord Progression</div>
+      <div class="chords-viz" id="chords-viz"></div>
+    </div>
+  </div>
+
+  <!-- ── History ───────────────────────────────────────────── -->
+  <div class="card" id="history-card" style="display:none">
+    <div class="card-title">Recent Generations</div>
+    <div class="history-list" id="history-body"></div>
+  </div>
+
+<script>
+function stepVal(id, delta, min, max) {
+  const el = document.getElementById(id);
+  el.value = Math.min(max, Math.max(min, +el.value + delta));
+}
+
+function chordQuality(chord) {
+  if (/dim/.test(chord) || /o7?$/.test(chord)) return 'cq-dim';
+  if (/aug|\+/.test(chord))                     return 'cq-aug';
+  if (/sus/.test(chord))                         return 'cq-sus';
+  if (/m[^a]|min|-/.test(chord))                 return 'cq-min';
+  if (/7$/.test(chord))                          return 'cq-dom';
+  return 'cq-maj';
+}
+
+async function generate() {
+  const btn = document.getElementById('gen-btn');
+  const pw  = document.getElementById('progress-wrap');
+  const pm  = document.getElementById('progress-msg');
+  const res = document.getElementById('chords-result');
+  const dl  = document.getElementById('dl-btn');
+
+  btn.disabled = true;
+  pw.style.display = 'block';
+  pm.textContent = 'Generating with Claude AI…';
+  res.style.display = 'none';
+  dl.style.display = 'none';
+
+  const form = new FormData();
+  form.append('genre', document.getElementById('genre').value);
+  form.append('mood',  document.getElementById('mood').value);
+  form.append('key',   document.getElementById('key').value);
+  form.append('scale', document.getElementById('scale').value);
+  form.append('bars',  document.getElementById('bars').value);
+  form.append('tempo', document.getElementById('tempo').value);
+
+  try {
+    const resp = await fetch('/generate-chords', { method: 'POST', body: form });
+    const data = await resp.json();
+    if (!resp.ok) {
+      pm.textContent = '❌ ' + (data.error || 'Generation failed.');
+      return;
+    }
+
+    // Render chord pills
+    const viz = document.getElementById('chords-viz');
+    viz.innerHTML = data.chords.map(c => {
+      const q = chordQuality(c.chord || '');
+      const beatLabel = c.beats === 1 ? '1 beat' : c.beats + ' beats';
+      return `<div class="chord-pill ${q}">
+        <span>${c.chord}</span>
+        <span class="ch-beats">${beatLabel}</span>
+      </div>`;
+    }).join('');
+
+    // Build download link from base64
+    const bytes = Uint8Array.from(atob(data.midi_b64), ch => ch.charCodeAt(0));
+    const blob = new Blob([bytes], { type: 'audio/midi' });
+    dl.href = URL.createObjectURL(blob);
+    dl.download = data.filename || 'chords.mid';
+    dl.style.display = 'inline-flex';
+
+    res.style.display = 'block';
+    pm.textContent = `✓ Generated ${data.chords.length} chords.`;
+    loadHistory();
+  } catch (e) {
+    pm.textContent = '❌ ' + e.message;
+  } finally {
+    btn.disabled = false;
+    const fill = document.getElementById('progress-fill');
+    fill.classList.remove('indeterminate');
+    fill.style.width = '100%';
+  }
+}
+
+async function loadHistory() {
+  try {
+    const resp = await fetch('/history');
+    const entries = await resp.json();
+    const card = document.getElementById('history-card');
+    const body = document.getElementById('history-body');
+    // Only show chord entries (contain 'chord' in filename)
+    const chordEntries = entries.filter(e => e.filename.includes('chord'));
+    if (!chordEntries.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    body.innerHTML = chordEntries.map(e => `
+      <div class="history-item">
+        <div class="history-icon">🎸</div>
+        <div class="history-info">
+          <div class="history-name">${e.filename}</div>
+          <div class="history-meta">${e.note_count} chords · ${e.created_at}</div>
+        </div>
+        <a href="/download/${e.id}" class="history-dl">⬇ MIDI</a>
+      </div>`).join('');
+  } catch {}
+}
+loadHistory();
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@ services:
       - /volume1/piano/output:/output
     environment:
       - PIANO_PASSWORD=changeme        # ← change this!
+      - ANTHROPIC_API_KEY=             # ← add your key here
     restart: unless-stopped
 
   # ── Watchdog (folder → MIDI auto-converter) ───────────────────────────────

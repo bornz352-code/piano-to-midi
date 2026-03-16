@@ -3,6 +3,9 @@ from __future__ import annotations
 import sys
 import os
 import io
+import re
+import json
+import base64
 import secrets
 import tempfile
 import threading
@@ -34,6 +37,42 @@ if not _PASSWORD:
     print(f"  Password: {_PASSWORD}  (set PIANO_PASSWORD env var to choose your own)")
 
 
+# ── Chord helpers ─────────────────────────────────────────────────────────────
+_NOTE_SEMITONES = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
+_CHORD_INTERVALS = {
+    '':      [0, 4, 7], 'maj':  [0, 4, 7],  'M':   [0, 4, 7],
+    'm':     [0, 3, 7], 'min':  [0, 3, 7],  '-':   [0, 3, 7],
+    '5':     [0, 7],
+    '6':     [0, 4, 7, 9],  'm6':   [0, 3, 7, 9],
+    '7':     [0, 4, 7, 10], 'maj7': [0, 4, 7, 11], 'M7': [0, 4, 7, 11],
+    'm7':    [0, 3, 7, 10], 'mM7':  [0, 3, 7, 11],
+    'dim':   [0, 3, 6],     'o':    [0, 3, 6],
+    'dim7':  [0, 3, 6, 9],  'o7':   [0, 3, 6, 9],
+    'm7b5':  [0, 3, 6, 10], 'ø7':   [0, 3, 6, 10],
+    'aug':   [0, 4, 8],     '+':    [0, 4, 8],
+    'sus2':  [0, 2, 7],     'sus4': [0, 5, 7],     'sus': [0, 5, 7],
+    'add9':  [0, 4, 7, 14],
+    '9':     [0, 4, 7, 10, 14],  'maj9': [0, 4, 7, 11, 14], 'm9': [0, 3, 7, 10, 14],
+    '11':    [0, 4, 7, 10, 14, 17],
+    '13':    [0, 4, 7, 10, 14, 17, 21],
+}
+
+
+def _chord_to_notes(chord_name: str, octave: int = 4) -> list:
+    """Convert a chord name like 'Cmaj7' to MIDI note numbers."""
+    m = re.match(r'^([A-G][#b]?)(.*?)(?:/[A-G][#b]?)?$', chord_name.strip())
+    if not m:
+        return [60, 64, 67]
+    root_str, quality = m.group(1), m.group(2)
+    semitone = _NOTE_SEMITONES.get(root_str[0], 0)
+    if len(root_str) > 1:
+        semitone += (1 if root_str[1] == '#' else -1)
+    semitone = semitone % 12
+    base = 12 * (octave + 1) + semitone  # C4 = 60
+    intervals = _CHORD_INTERVALS.get(quality, [0, 4, 7])
+    return [base + i for i in intervals if 0 <= base + i <= 127]
+
+
 def login_required(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -50,7 +89,7 @@ def login():
     if request.method == "POST":
         if secrets.compare_digest(request.form.get("password", ""), _PASSWORD):
             session["authenticated"] = True
-            return redirect(request.args.get("next") or url_for("index"))
+            return redirect(request.args.get("next") or url_for("home"))
         error = "Incorrect password."
     return render_template("login.html", error=error)
 
@@ -116,6 +155,12 @@ def _set_error(job_id: str, err: str):
 
 # ── App routes ────────────────────────────────────────────────────────────────
 @app.route("/")
+@login_required
+def home():
+    return render_template("home.html")
+
+
+@app.route("/audio-to-midi")
 @login_required
 def index():
     return render_template("index.html")
@@ -252,14 +297,14 @@ def fetch_url():
     out_template = os.path.join(tmp_dir, "audio.%(ext)s")
 
     import imageio_ffmpeg
-    ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": out_template,
         "quiet": True,
         "no_warnings": True,
-        "ffmpeg_location": ffmpeg_dir,
+        "ffmpeg_location": ffmpeg_exe,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "wav",
@@ -353,6 +398,85 @@ def convert_url():
                 os.unlink(tmp_wav.name)
             except OSError:
                 pass
+
+
+@app.route("/chord-generator")
+@login_required
+def chord_generator():
+    return render_template("chords.html")
+
+
+@app.route("/generate-chords", methods=["POST"])
+@login_required
+def generate_chords():
+    import anthropic
+    import pretty_midi
+
+    genre = request.form.get("genre", "Jazz")
+    mood = request.form.get("mood", "Happy")
+    key = request.form.get("key", "C")
+    scale = request.form.get("scale", "Major")
+    bars = max(1, min(32, int(request.form.get("bars", 4))))
+    tempo = max(20, min(300, int(request.form.get("tempo", 120))))
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return jsonify({"error": "ANTHROPIC_API_KEY is not configured."}), 500
+
+    client = anthropic.Anthropic(api_key=api_key)
+    prompt = (
+        f"Create a {bars}-bar chord progression for a {genre} song.\n"
+        f"Mood: {mood}\nKey: {key} {scale}\nTime signature: 4/4\n\n"
+        "Return ONLY a JSON array. Each element must have:\n"
+        '- "chord": chord name (e.g. "Cmaj7", "Am7", "F#m", "Bb7")\n'
+        '- "beats": integer beats (1, 2, or 4)\n'
+        f"Total beats must equal exactly {bars * 4}.\n"
+        "Return only the JSON array, no explanation or markdown."
+    )
+
+    try:
+        message = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = message.content[0].text.strip()
+        match = re.search(r'\[[\s\S]*\]', text)
+        if not match:
+            return jsonify({"error": "Could not parse chord progression from Claude response."}), 500
+        chords = json.loads(match.group())
+    except Exception as exc:
+        return jsonify({"error": f"Claude API error: {exc}"}), 500
+
+    try:
+        pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
+        instrument = pretty_midi.Instrument(program=0, name="Piano")
+        beats_per_second = tempo / 60.0
+        current_time = 0.0
+        for entry in chords:
+            chord_name = entry.get("chord", "C")
+            beats = max(1, int(entry.get("beats", 4)))
+            duration = beats / beats_per_second
+            for pitch in _chord_to_notes(chord_name):
+                instrument.notes.append(pretty_midi.Note(
+                    velocity=80, pitch=pitch,
+                    start=current_time, end=current_time + duration - 0.05,
+                ))
+            current_time += duration
+        pm.instruments.append(instrument)
+        buf = io.BytesIO()
+        pm.write(buf)
+        midi_bytes = buf.getvalue()
+    except Exception as exc:
+        return jsonify({"error": f"MIDI generation error: {exc}"}), 500
+
+    filename = f"chords_{genre.lower()}_{key}{scale[0].lower()}.mid"
+    _add_to_history(filename, len(chords), midi_bytes)
+    return jsonify({
+        "chords": chords,
+        "midi_b64": base64.b64encode(midi_bytes).decode(),
+        "filename": filename,
+    })
 
 
 if __name__ == "__main__":

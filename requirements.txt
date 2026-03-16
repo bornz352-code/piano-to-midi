@@ -9,3 +9,5 @@ imageio-ffmpeg>=0.4.9
 yt-dlp>=2024.1.0
 basic-pitch>=0.3.0
 onnxruntime>=1.16.0
+anthropic>=0.40.0
+pretty-midi>=0.2.10

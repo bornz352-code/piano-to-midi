@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sample Name Generator — Piano Studio</title>
+  <title>Beat Name Generator — Piano Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -50,7 +50,6 @@
       font-size: 12px; color: var(--sub); text-decoration: none;
       padding: 6px 12px; border: 1px solid var(--border);
       border-radius: 6px; transition: color 0.15s, border-color 0.15s;
-      display: flex; align-items: center; gap: 6px;
     }
     .back:hover { color: var(--text); border-color: var(--border2); }
     .page-title { display: flex; align-items: center; gap: 12px; }
@@ -65,7 +64,6 @@
 
     .main { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 20px; }
 
-    /* ── Form card ── */
     .form-card {
       background: var(--panel); border: 1px solid var(--border);
       border-radius: var(--r); padding: 28px 24px;
@@ -82,26 +80,6 @@
     .field select:focus, .field input:focus { border-color: var(--teal); }
     .field input::placeholder { color: var(--sub); }
 
-    /* chips */
-    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip {
-      font-size: 12px; font-weight: 500;
-      padding: 5px 12px; border-radius: 99px;
-      border: 1px solid var(--border); background: transparent;
-      color: var(--sub); cursor: pointer; transition: all 0.15s;
-      font-family: inherit;
-    }
-    .chip:hover { border-color: var(--border2); color: var(--text); }
-    .chip.active {
-      background: rgba(91,197,223,0.15); border-color: rgba(91,197,223,0.4);
-      color: var(--teal);
-    }
-
-    .section-label {
-      font-size: 11px; font-weight: 600; color: var(--sub);
-      text-transform: uppercase; letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
     .divider { height: 1px; background: var(--border); margin: 20px 0; }
 
     .generate-btn {
@@ -115,7 +93,6 @@
     .generate-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
     .generate-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-    /* ── Results card ── */
     .results-card {
       background: var(--panel); border: 1px solid var(--border);
       border-radius: var(--r); padding: 24px;
@@ -137,14 +114,14 @@
 
     .names-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 8px;
     }
     .name-item {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 8px; padding: 9px 12px;
-      font-size: 12px; font-family: "SF Mono", "Fira Code", monospace;
+      border-radius: 8px; padding: 10px 13px;
+      font-size: 13px; font-weight: 500;
       color: var(--text); gap: 8px;
       transition: border-color 0.15s;
     }
@@ -180,8 +157,8 @@
     <div class="page-title">
       <div class="page-icon">🏷️</div>
       <div>
-        <h1>Sample Name Generator</h1>
-        <p>Generate creative names for your sample packs</p>
+        <h1>Beat Name Generator</h1>
+        <p>AI-generated titles for your beats</p>
       </div>
     </div>
     <div style="width:80px"></div>
@@ -190,29 +167,6 @@
   <div class="main">
 
     <div class="form-card">
-
-      <!-- Instrument type chips -->
-      <div class="section-label">Instrument / Type</div>
-      <div class="chip-group" id="instr-chips">
-        <button class="chip active" data-val="Kick">Kick</button>
-        <button class="chip" data-val="Snare">Snare</button>
-        <button class="chip" data-val="Hi-Hat">Hi-Hat</button>
-        <button class="chip" data-val="Clap">Clap</button>
-        <button class="chip" data-val="Perc">Perc</button>
-        <button class="chip" data-val="Bass">Bass</button>
-        <button class="chip" data-val="Lead Synth">Lead</button>
-        <button class="chip" data-val="Pad">Pad</button>
-        <button class="chip" data-val="Pluck">Pluck</button>
-        <button class="chip" data-val="FX / Riser">FX</button>
-        <button class="chip" data-val="Loop">Loop</button>
-        <button class="chip" data-val="Vocal Chop">Vocal</button>
-        <button class="chip" data-val="Guitar">Guitar</button>
-        <button class="chip" data-val="Piano">Piano</button>
-        <button class="chip" data-val="Strings">Strings</button>
-      </div>
-
-      <div class="divider"></div>
-
       <div class="form-row">
         <div class="field">
           <label>Genre</label>
@@ -231,6 +185,8 @@
             <option>Rock</option>
             <option>Jazz</option>
             <option>Cinematic</option>
+            <option>Drill</option>
+            <option>UK Garage</option>
           </select>
         </div>
         <div class="field">
@@ -244,8 +200,8 @@
             <option>Melancholic</option>
             <option>Euphoric</option>
             <option>Mysterious</option>
-            <option>Punchy</option>
-            <option>Smooth</option>
+            <option>Romantic</option>
+            <option>Motivational</option>
             <option>Raw / Gritty</option>
             <option>Warm</option>
           </select>
@@ -270,7 +226,7 @@
       </div>
 
       <button class="generate-btn" id="gen-btn" onclick="generate()">
-        <span id="btn-label">Generate Names</span>
+        <span id="btn-label">Generate Beat Names</span>
         <div class="spinner" id="btn-spinner"></div>
       </button>
 
@@ -288,19 +244,6 @@
   </div>
 
   <script>
-    // Chip selection
-    document.querySelectorAll('#instr-chips .chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        document.querySelectorAll('#instr-chips .chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-      });
-    });
-
-    function getInstrument() {
-      const active = document.querySelector('#instr-chips .chip.active');
-      return active ? active.dataset.val : 'Kick';
-    }
-
     async function generate() {
       const btn = document.getElementById('gen-btn');
       const label = document.getElementById('btn-label');
@@ -313,7 +256,6 @@
       errorMsg.style.display = 'none';
 
       const fd = new FormData();
-      fd.append('instrument', getInstrument());
       fd.append('genre', document.getElementById('genre').value);
       fd.append('mood', document.getElementById('mood').value);
       fd.append('key', document.getElementById('key').value);
@@ -340,14 +282,14 @@
       const grid = document.getElementById('names-grid');
       const title = document.getElementById('results-title');
 
-      title.textContent = `${names.length} Names Generated`;
+      title.textContent = `${names.length} Beat Names`;
       grid.innerHTML = '';
       names.forEach((name, i) => {
         const item = document.createElement('div');
         item.className = 'name-item';
         item.innerHTML = `
           <span class="name-text" title="${name}">${name}</span>
-          <button class="copy-btn" id="copy-${i}" onclick="copyName('${name}', ${i})">Copy</button>
+          <button class="copy-btn" id="copy-${i}" onclick="copyName('${name.replace(/'/g, "\\'")}', ${i})">Copy</button>
         `;
         grid.appendChild(item);
       });

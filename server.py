@@ -742,7 +742,6 @@ def generate_sample_names():
     if not api_key:
         return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
 
-    instrument = request.form.get("instrument", "Kick")
     genre      = request.form.get("genre", "Trap")
     mood       = request.form.get("mood", "Dark")
     key        = request.form.get("key", "").strip()
@@ -756,17 +755,16 @@ def generate_sample_names():
         extras += f"- BPM: {bpm}\n"
 
     prompt = (
-        f"You are a professional sample pack creator. Generate {count} unique, creative sample file names for:\n"
-        f"- Instrument / type: {instrument}\n"
+        f"You are a professional music producer and beat maker. Generate {count} unique, creative beat/track titles for:\n"
         f"- Genre: {genre}\n"
         f"- Mood / vibe: {mood}\n"
         + extras +
         "\nNaming rules:\n"
-        "- Use underscores instead of spaces\n"
-        "- Mix short descriptive names with evocative/poetic ones\n"
-        "- Include numbered variants where it makes sense (_01, _02…)\n"
-        "- Each name should be 2–5 segments long\n"
-        "- No duplicates, no file extensions\n"
+        "- These are beat titles, not file names — use normal words and spaces\n"
+        "- Mix cinematic/evocative titles with street/raw ones depending on genre\n"
+        "- Keep names short: 1–4 words\n"
+        "- Vary the style: some abstract, some descriptive, some punchy one-worders\n"
+        "- No duplicates\n"
         "\nReturn ONLY a JSON array of strings. No explanation, no markdown."
     )
 

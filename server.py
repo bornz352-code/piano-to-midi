@@ -726,6 +726,202 @@ def _pattern_to_wav_bytes(instruments: dict, bpm: float, bars: int) -> bytes:
     return buf.getvalue()
 
 
+# ── One-shot synthesizer ──────────────────────────────────────────────────────
+_ONESHOT_SR = 44100
+
+_ONESHOT_PROMPT = """\
+You are an expert audio synthesizer programmer. The user has described a one-shot sound.
+Convert their description into synthesis parameters as JSON.
+
+Rules:
+- "layers" is an array of 1–3 synthesis layers that will be mixed together.
+- Each layer has these fields (all required):
+  - "osc": one of "sine", "square", "saw", "triangle", "noise"
+  - "freq": base frequency in Hz (20–20000); use 0 for pure noise layers
+  - "freq_end": frequency at end of sound (for pitch sweeps); same as freq if no sweep
+  - "freq_decay": how fast pitch sweeps (0.01=slow, 10=instant); 0 = no sweep
+  - "amp": layer amplitude 0.0–1.0
+  - "attack": attack time in seconds (0.001–0.5)
+  - "decay": decay time in seconds (0.01–3.0)
+  - "sustain": sustain level 0.0–1.0 (0 for percussive sounds)
+  - "release": release time in seconds (0.005–2.0)
+  - "filter": "none", "lowpass", "highpass", or "bandpass"
+  - "filter_freq": filter cutoff in Hz (100–20000)
+  - "filter_q": filter resonance 0.5–8.0
+  - "distortion": soft-clip amount 0.0–1.0
+- "duration": total sound length in seconds (0.05–4.0)
+- "normalize": true
+
+Examples of good layer combinations:
+- Deep kick: layer1=sine sweep 150→45Hz + layer2=noise highpass transient click
+- Snappy snare: layer1=sine 200Hz short + layer2=noise highpass
+- Airy pad: layer1=saw + layer2=square detune + layer3=sine sub
+- Pluck: layer1=saw with fast decay, filter_q high
+- 808: layer1=sine sweep very long decay
+
+User description: {description}
+
+Return ONLY raw JSON, no markdown, no explanation."""
+
+
+def _synth_oneshot(params: dict) -> bytes:
+    from scipy.signal import sosfilt, butter
+
+    sr = _ONESHOT_SR
+    dur = float(np.clip(params.get("duration", 0.5), 0.05, 4.0))
+    n = int(dur * sr)
+    mix = np.zeros(n, dtype=np.float64)
+
+    for layer in params.get("layers", [])[:3]:
+        osc_type   = layer.get("osc", "sine")
+        freq       = float(layer.get("freq", 440))
+        freq_end   = float(layer.get("freq_end", freq))
+        freq_decay = float(layer.get("freq_decay", 0))
+        amp        = float(np.clip(layer.get("amp", 1.0), 0.0, 1.0))
+        attack     = float(np.clip(layer.get("attack", 0.005), 0.001, 0.5))
+        decay_t    = float(np.clip(layer.get("decay", 0.3), 0.01, 3.0))
+        sustain    = float(np.clip(layer.get("sustain", 0.0), 0.0, 1.0))
+        release    = float(np.clip(layer.get("release", 0.05), 0.005, 2.0))
+        filt       = layer.get("filter", "none")
+        filt_freq  = float(np.clip(layer.get("filter_freq", 8000), 20, sr / 2 - 1))
+        filt_q     = float(np.clip(layer.get("filter_q", 1.0), 0.1, 20.0))
+        dist       = float(np.clip(layer.get("distortion", 0.0), 0.0, 1.0))
+
+        t = np.linspace(0, dur, n, endpoint=False)
+
+        # oscillator
+        if osc_type == "noise":
+            sig = np.random.randn(n)
+        else:
+            if freq_decay > 0 and abs(freq_end - freq) > 0.5:
+                inst_freq = (freq - freq_end) * np.exp(-t * freq_decay) + freq_end
+            else:
+                inst_freq = np.full(n, freq)
+            phase = np.cumsum(2 * np.pi * inst_freq / sr)
+            if osc_type == "square":
+                sig = np.sign(np.sin(phase))
+            elif osc_type == "saw":
+                sig = 2 * (phase / (2 * np.pi) % 1) - 1
+            elif osc_type == "triangle":
+                sig = 2 * np.abs(2 * (phase / (2 * np.pi) % 1) - 1) - 1
+            else:
+                sig = np.sin(phase)
+
+        # ADSR envelope
+        a_s = max(1, int(attack * sr))
+        d_s = max(1, int(decay_t * sr))
+        r_s = max(1, int(release * sr))
+        env = np.ones(n) * sustain
+        env[:a_s] = np.linspace(0, 1, a_s)
+        d_end = min(a_s + d_s, n)
+        env[a_s:d_end] = np.linspace(1, sustain, d_end - a_s)
+        tail_start = max(0, n - r_s)
+        env[tail_start:] *= np.linspace(1, 0, n - tail_start)
+
+        sig = sig * env
+
+        # filter
+        if filt != "none" and filt_freq < sr / 2 - 10:
+            norm_freq = filt_freq / (sr / 2)
+            norm_freq = float(np.clip(norm_freq, 1e-4, 0.9999))
+            try:
+                if filt == "bandpass":
+                    bw = norm_freq / max(filt_q, 0.1)
+                    lo = max(1e-4, norm_freq - bw / 2)
+                    hi = min(0.9999, norm_freq + bw / 2)
+                    sos = butter(2, [lo, hi], btype="band", output="sos")
+                else:
+                    btype = "low" if filt == "lowpass" else "high"
+                    sos = butter(2, norm_freq, btype=btype, output="sos")
+                sig = sosfilt(sos, sig)
+            except Exception:
+                pass
+
+        # soft-clip distortion
+        if dist > 0.01:
+            drive = 1.0 + dist * 15
+            sig = np.tanh(sig * drive) / np.tanh(drive)
+
+        mix += sig * amp
+
+    # normalize
+    peak = np.max(np.abs(mix))
+    if peak > 1e-6:
+        mix = mix / peak * 0.92
+
+    buf = io.BytesIO()
+    sf.write(buf, (np.clip(mix, -1, 1) * 32767).astype(np.int16),
+             sr, format="WAV", subtype="PCM_16")
+    buf.seek(0)
+    return buf.getvalue()
+
+
+# in-memory store for generated one-shots
+_oneshot_store: dict[str, bytes] = {}
+_oneshot_store_lock = threading.Lock()
+
+
+@app.route("/one-shot")
+@login_required
+def one_shot():
+    return render_template("one_shot.html")
+
+
+@app.route("/generate-oneshot", methods=["POST"])
+@login_required
+def generate_oneshot():
+    import anthropic
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
+
+    description = (request.form.get("description") or "").strip()
+    if not description:
+        return jsonify({"error": "Please describe the sound you want."}), 400
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        msg = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=1024,
+            messages=[{"role": "user",
+                        "content": _ONESHOT_PROMPT.replace("{description}", description)}],
+        )
+        text = msg.content[0].text.strip()
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        params = json.loads(text)
+    except Exception as exc:
+        return jsonify({"error": f"Claude API error: {exc}"}), 500
+
+    try:
+        wav_bytes = _synth_oneshot(params)
+    except Exception as exc:
+        return jsonify({"error": f"Synthesis error: {exc}"}), 500
+
+    sound_id = secrets.token_hex(8)
+    with _oneshot_store_lock:
+        if len(_oneshot_store) >= 50:
+            del _oneshot_store[next(iter(_oneshot_store))]
+        _oneshot_store[sound_id] = wav_bytes
+
+    safe_name = re.sub(r"[^\w\s\-]", "", description)[:40].strip().replace(" ", "_")
+    return jsonify({"id": sound_id, "filename": f"{safe_name}.wav",
+                    "params": params})
+
+
+@app.route("/oneshot-audio/<sound_id>")
+@login_required
+def oneshot_audio(sound_id: str):
+    with _oneshot_store_lock:
+        wav = _oneshot_store.get(sound_id)
+    if not wav:
+        return jsonify({"error": "Sound not found."}), 404
+    return send_file(io.BytesIO(wav), mimetype="audio/wav",
+                     as_attachment=False, download_name=f"{sound_id}.wav")
+
+
 # ── Perc loop routes ──────────────────────────────────────────────────────────
 @app.route("/sample-names")
 @login_required

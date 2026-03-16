@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>One-Shot Generator — Piano Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #22243a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --green:   #6fcf97;
+      --purple:  #b39ddb;
+      --peach:   #f0a07a;
+      --r:       14px;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 40% at 15% 25%, rgba(240,160,122,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 85% 75%, rgba(179,157,219,0.06) 0%, transparent 70%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 48px 16px 80px;
+    }
+
+    header {
+      width: 100%; max-width: 680px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 44px;
+    }
+    .back {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+    }
+    .back:hover { color: var(--text); border-color: var(--border2); }
+    .page-title { display: flex; align-items: center; gap: 12px; }
+    .page-icon {
+      width: 40px; height: 40px; border-radius: 11px;
+      background: linear-gradient(135deg, #f0a07a, #b39ddb);
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      box-shadow: 0 4px 16px rgba(240,160,122,0.35);
+    }
+    .page-title h1 { font-size: 18px; font-weight: 700; }
+    .page-title p  { font-size: 12px; color: var(--sub); margin-top: 1px; }
+
+    .main { width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* Input card */
+    .form-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 28px 24px;
+    }
+    .input-wrap { position: relative; }
+    textarea {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-family: inherit; font-size: 15px;
+      padding: 14px 16px; resize: none; outline: none;
+      transition: border-color 0.15s; line-height: 1.5;
+      min-height: 80px;
+    }
+    textarea:focus { border-color: var(--peach); }
+    textarea::placeholder { color: var(--sub); }
+
+    .examples {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+    }
+    .example-pill {
+      font-size: 11px; font-weight: 500; padding: 4px 10px;
+      border-radius: 99px; border: 1px solid var(--border);
+      color: var(--sub); cursor: pointer; background: none;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .example-pill:hover {
+      color: var(--peach); border-color: rgba(240,160,122,0.3);
+      background: rgba(240,160,122,0.08);
+    }
+
+    .generate-btn {
+      width: 100%; padding: 11px; margin-top: 16px;
+      background: linear-gradient(135deg, #f0a07a, #b39ddb);
+      border: none; border-radius: 9px;
+      color: #fff; font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .generate-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .generate-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .spinner {
+      width: 16px; height: 16px; display: none;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg {
+      background: rgba(240,122,122,0.1); border: 1px solid rgba(240,122,122,0.25);
+      color: #f07a7a; border-radius: 9px; padding: 12px 16px;
+      font-size: 13px; display: none; margin-top: 12px;
+    }
+
+    /* Result card */
+    .result-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+      display: none;
+    }
+    .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .result-header h2 { font-size: 15px; font-weight: 700; }
+    .dl-btn {
+      font-size: 12px; font-weight: 600; text-decoration: none;
+      padding: 7px 16px; border-radius: 7px;
+      background: rgba(240,160,122,0.12); border: 1px solid rgba(240,160,122,0.25);
+      color: var(--peach); transition: background 0.15s;
+    }
+    .dl-btn:hover { background: rgba(240,160,122,0.2); }
+
+    /* Waveform / player */
+    .player-wrap {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px 20px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 20px;
+    }
+    .play-btn {
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, #f0a07a, #b39ddb);
+      border: none; cursor: pointer; color: #fff; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .play-btn:hover { opacity: 0.85; transform: scale(1.05); }
+    .waveform-bar {
+      flex: 1; height: 48px; position: relative;
+    }
+    canvas#waveform {
+      width: 100%; height: 100%; border-radius: 4px;
+    }
+    .time-label { font-size: 11px; color: var(--sub); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+    /* Params accordion */
+    .params-toggle {
+      font-size: 12px; color: var(--sub); background: none; border: none;
+      cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px;
+      padding: 0; transition: color 0.15s; margin-bottom: 12px;
+    }
+    .params-toggle:hover { color: var(--text); }
+    .params-toggle .arrow { transition: transform 0.2s; }
+    .params-toggle.open .arrow { transform: rotate(90deg); }
+    .params-body {
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 9px; padding: 14px 16px;
+      font-size: 12px; font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--sub); white-space: pre-wrap; word-break: break-all;
+      max-height: 260px; overflow-y: auto;
+    }
+    .params-body.open { display: block; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="back">← Home</a>
+    <div class="page-title">
+      <div class="page-icon">🔊</div>
+      <div>
+        <h1>One-Shot Generator</h1>
+        <p>Describe a sound — Claude synthesizes it</p>
+      </div>
+    </div>
+    <div style="width:80px"></div>
+  </header>
+
+  <div class="main">
+
+    <div class="form-card">
+      <div class="input-wrap">
+        <textarea id="desc" rows="3"
+          placeholder="e.g. deep 808 kick with long sub tail, punchy trap snare with reverb, bright pluck in C4…"></textarea>
+      </div>
+
+      <div class="examples">
+        <button class="example-pill" onclick="setDesc(this)">deep 808 sub kick</button>
+        <button class="example-pill" onclick="setDesc(this)">crispy trap snare</button>
+        <button class="example-pill" onclick="setDesc(this)">tight closed hi-hat</button>
+        <button class="example-pill" onclick="setDesc(this)">dark clap with reverb tail</button>
+        <button class="example-pill" onclick="setDesc(this)">bright piano pluck C4</button>
+        <button class="example-pill" onclick="setDesc(this)">fat saw bass hit</button>
+        <button class="example-pill" onclick="setDesc(this)">airy pad swell</button>
+        <button class="example-pill" onclick="setDesc(this)">vinyl record scratch FX</button>
+        <button class="example-pill" onclick="setDesc(this)">distorted 808 with pitch drop</button>
+        <button class="example-pill" onclick="setDesc(this)">soft kick with sub warmth</button>
+      </div>
+
+      <button class="generate-btn" id="gen-btn" onclick="generate()">
+        <div class="spinner" id="spinner"></div>
+        <span id="btn-label">Generate Sound</span>
+      </button>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="result-card" id="result-card">
+      <div class="result-header">
+        <h2 id="result-title">Generated Sound</h2>
+        <a id="dl-link" href="#" class="dl-btn" download>⬇ Download WAV</a>
+      </div>
+
+      <div class="player-wrap">
+        <button class="play-btn" id="play-btn" onclick="togglePlay()">▶</button>
+        <div class="waveform-bar">
+          <canvas id="waveform"></canvas>
+        </div>
+        <span class="time-label" id="time-label">0.00s</span>
+      </div>
+
+      <button class="params-toggle" id="params-toggle" onclick="toggleParams()">
+        <span class="arrow">▶</span> Synthesis parameters
+      </button>
+      <pre class="params-body" id="params-body"></pre>
+    </div>
+
+  </div>
+
+  <script>
+    let _audioCtx = null;
+    let _audioBuffer = null;
+    let _source = null;
+    let _playing = false;
+    let _startTime = 0;
+    let _offset = 0;
+
+    function setDesc(el) {
+      document.getElementById('desc').value = el.textContent;
+      document.getElementById('desc').focus();
+    }
+
+    async function generate() {
+      const desc = document.getElementById('desc').value.trim();
+      if (!desc) return;
+
+      const btn = document.getElementById('gen-btn');
+      const label = document.getElementById('btn-label');
+      const spinner = document.getElementById('spinner');
+      const errorMsg = document.getElementById('error-msg');
+
+      btn.disabled = true;
+      label.textContent = 'Generating…';
+      spinner.style.display = 'block';
+      errorMsg.style.display = 'none';
+
+      const fd = new FormData();
+      fd.append('description', desc);
+
+      try {
+        const res = await fetch('/generate-oneshot', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        // fetch the audio
+        const wavRes = await fetch(`/oneshot-audio/${data.id}`);
+        const arrayBuf = await wavRes.arrayBuffer();
+
+        _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        _audioBuffer = await _audioCtx.decodeAudioData(arrayBuf);
+
+        // update UI
+        document.getElementById('result-title').textContent = desc;
+        document.getElementById('dl-link').href = `/oneshot-audio/${data.id}`;
+        document.getElementById('dl-link').download = data.filename;
+        document.getElementById('time-label').textContent = _audioBuffer.duration.toFixed(2) + 's';
+        document.getElementById('params-body').textContent = JSON.stringify(data.params, null, 2);
+
+        drawWaveform(_audioBuffer);
+        stopAudio();
+
+        document.getElementById('result-card').style.display = 'block';
+        document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      } catch (e) {
+        errorMsg.textContent = '❌ ' + e.message;
+        errorMsg.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        label.textContent = 'Generate Sound';
+        spinner.style.display = 'none';
+      }
+    }
+
+    function drawWaveform(buffer) {
+      const canvas = document.getElementById('waveform');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.offsetWidth, H = canvas.offsetHeight;
+      canvas.width = W * window.devicePixelRatio;
+      canvas.height = H * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+      const data = buffer.getChannelData(0);
+      const step = Math.ceil(data.length / W);
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(240,160,122,0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < W; i++) {
+        let max = 0;
+        for (let j = 0; j < step; j++) {
+          const v = Math.abs(data[i * step + j] || 0);
+          if (v > max) max = v;
+        }
+        const h = max * (H / 2);
+        ctx.moveTo(i, H / 2 - h);
+        ctx.lineTo(i, H / 2 + h);
+      }
+      ctx.stroke();
+    }
+
+    function togglePlay() {
+      if (_playing) { stopAudio(); } else { playAudio(); }
+    }
+
+    function playAudio() {
+      if (!_audioBuffer || !_audioCtx) return;
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      _source = _audioCtx.createBufferSource();
+      _source.buffer = _audioBuffer;
+      _source.connect(_audioCtx.destination);
+      _source.onended = () => { _playing = false; document.getElementById('play-btn').textContent = '▶'; };
+      _source.start(0, _offset);
+      _startTime = _audioCtx.currentTime - _offset;
+      _playing = true;
+      document.getElementById('play-btn').textContent = '⏹';
+    }
+
+    function stopAudio() {
+      if (_source) { try { _source.stop(); } catch(e) {} _source = null; }
+      _playing = false;
+      _offset = 0;
+      document.getElementById('play-btn').textContent = '▶';
+    }
+
+    function toggleParams() {
+      const toggle = document.getElementById('params-toggle');
+      const body = document.getElementById('params-body');
+      toggle.classList.toggle('open');
+      body.classList.toggle('open');
+    }
+
+    // submit on Ctrl/Cmd+Enter
+    document.getElementById('desc').addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate();
+    });
+  </script>
+</body>
+</html>

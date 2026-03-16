@@ -312,9 +312,20 @@ function drawPianoRoll(notes) {
     const y = (MIDI_MAX - n.pitch) * ROW_H;
     const x = n.start * PX_PER_S;
     const w = Math.max(2, (n.end - n.start) * PX_PER_S - 1);
+    const h = ROW_H - 2;
+    const r = Math.min(2, w / 2, h / 2);
     rx.fillStyle = palette[n.pitch % palette.length];
     rx.beginPath();
-    rx.roundRect(x, y + 1, w, ROW_H - 2, 2);
+    rx.moveTo(x + r, y + 1);
+    rx.lineTo(x + w - r, y + 1);
+    rx.arcTo(x + w, y + 1, x + w, y + 1 + r, r);
+    rx.lineTo(x + w, y + 1 + h - r);
+    rx.arcTo(x + w, y + 1 + h, x + w - r, y + 1 + h, r);
+    rx.lineTo(x + r, y + 1 + h);
+    rx.arcTo(x, y + 1 + h, x, y + 1 + h - r, r);
+    rx.lineTo(x, y + 1 + r);
+    rx.arcTo(x, y + 1, x + r, y + 1, r);
+    rx.closePath();
     rx.fill();
   });
 
@@ -388,13 +399,12 @@ async function startConvert() {
   form.append('job_id', jobId);
 
   // Start polling progress
-  let lastNotes = null;
   const pollId = setInterval(async () => {
     try {
       const r = await fetch('/progress/' + jobId);
       const d = await r.json();
       setProgress('convert', d.pct, d.msg);
-      if (d.done) { clearInterval(pollId); lastNotes = d.notes || null; }
+      if (d.done) clearInterval(pollId);
     } catch {}
   }, 400);
 
@@ -413,7 +423,10 @@ async function startConvert() {
     dl.href = url;
     dl.style.display = 'inline-flex';
     setProgress('convert', 100, '✓ Done! Click Download to save.');
-    if (lastNotes) drawPianoRoll(lastNotes);
+    // Fetch final progress to get notes for piano roll
+    const pr = await fetch('/progress/' + jobId);
+    const pd = await pr.json();
+    if (pd.notes && pd.notes.length) drawPianoRoll(pd.notes);
     loadHistory();
     // Draw piano roll from response headers isn't possible, so we'll just update msg
   } catch (e) {
@@ -490,13 +503,12 @@ async function processRecording() {
   form.append('tempo', tempo);
   form.append('job_id', jobId);
 
-  let recNotes = null;
   const pollId = setInterval(async () => {
     try {
       const r = await fetch('/progress/' + jobId);
       const d = await r.json();
       setProgress('rec', d.pct, d.msg);
-      if (d.done) { clearInterval(pollId); recNotes = d.notes || null; }
+      if (d.done) clearInterval(pollId);
     } catch {}
   }, 400);
 
@@ -514,7 +526,9 @@ async function processRecording() {
     dl.href = url;
     dl.style.display = 'inline-flex';
     setProgress('rec', 100, '✓ Done! Click Download to save.');
-    if (recNotes) drawPianoRoll(recNotes);
+    const pr = await fetch('/progress/' + jobId);
+    const pd = await pr.json();
+    if (pd.notes && pd.notes.length) drawPianoRoll(pd.notes);
     loadHistory();
   } catch (e) {
     clearInterval(pollId);

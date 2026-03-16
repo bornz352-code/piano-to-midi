@@ -727,6 +727,70 @@ def _pattern_to_wav_bytes(instruments: dict, bpm: float, bars: int) -> bytes:
 
 
 # ── Perc loop routes ──────────────────────────────────────────────────────────
+@app.route("/sample-names")
+@login_required
+def sample_names():
+    return render_template("sample_names.html")
+
+
+@app.route("/generate-sample-names", methods=["POST"])
+@login_required
+def generate_sample_names():
+    import anthropic
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
+
+    instrument = request.form.get("instrument", "Kick")
+    genre      = request.form.get("genre", "Trap")
+    mood       = request.form.get("mood", "Dark")
+    key        = request.form.get("key", "").strip()
+    bpm        = request.form.get("bpm", "").strip()
+    count      = max(5, min(50, int(request.form.get("count", 20))))
+
+    extras = ""
+    if key:
+        extras += f"- Key: {key}\n"
+    if bpm:
+        extras += f"- BPM: {bpm}\n"
+
+    prompt = (
+        f"You are a professional sample pack creator. Generate {count} unique, creative sample file names for:\n"
+        f"- Instrument / type: {instrument}\n"
+        f"- Genre: {genre}\n"
+        f"- Mood / vibe: {mood}\n"
+        + extras +
+        "\nNaming rules:\n"
+        "- Use underscores instead of spaces\n"
+        "- Mix short descriptive names with evocative/poetic ones\n"
+        "- Include numbered variants where it makes sense (_01, _02…)\n"
+        "- Each name should be 2–5 segments long\n"
+        "- No duplicates, no file extensions\n"
+        "\nReturn ONLY a JSON array of strings. No explanation, no markdown."
+    )
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        msg = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = msg.content[0].text.strip()
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        match = re.search(r"\[[\s\S]*\]", text)
+        if not match:
+            return jsonify({"error": "Could not parse names from Claude."}), 500
+        names = json.loads(match.group())
+        if not isinstance(names, list):
+            return jsonify({"error": "Unexpected response format."}), 500
+        return jsonify({"names": [str(n) for n in names]})
+    except Exception as exc:
+        return jsonify({"error": f"Claude API error: {exc}"}), 500
+
+
 @app.route("/perc-loop")
 @login_required
 def perc_loop():

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sample Name Generator — Piano Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #22243a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --accent:  #7c9ef8;
+      --green:   #6fcf97;
+      --purple:  #b39ddb;
+      --peach:   #f0a07a;
+      --teal:    #5bc5df;
+      --r:       14px;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 40% at 20% 20%, rgba(91,197,223,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 80% 80%, rgba(124,158,248,0.06) 0%, transparent 70%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 80px;
+    }
+
+    header {
+      width: 100%; max-width: 760px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 44px;
+    }
+    .back {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .back:hover { color: var(--text); border-color: var(--border2); }
+    .page-title { display: flex; align-items: center; gap: 12px; }
+    .page-icon {
+      width: 40px; height: 40px; border-radius: 11px;
+      background: linear-gradient(135deg, #5bc5df, #7c9ef8);
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      box-shadow: 0 4px 16px rgba(91,197,223,0.35);
+    }
+    .page-title h1 { font-size: 18px; font-weight: 700; }
+    .page-title p  { font-size: 12px; color: var(--sub); margin-top: 1px; }
+
+    .main { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Form card ── */
+    .form-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 28px 24px;
+    }
+    .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+    .field label { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.5px; }
+    .field select, .field input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-family: inherit;
+      font-size: 13px; padding: 8px 11px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .field select:focus, .field input:focus { border-color: var(--teal); }
+    .field input::placeholder { color: var(--sub); }
+
+    /* chips */
+    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      font-size: 12px; font-weight: 500;
+      padding: 5px 12px; border-radius: 99px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--sub); cursor: pointer; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .chip:hover { border-color: var(--border2); color: var(--text); }
+    .chip.active {
+      background: rgba(91,197,223,0.15); border-color: rgba(91,197,223,0.4);
+      color: var(--teal);
+    }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    .generate-btn {
+      width: 100%; padding: 11px;
+      background: linear-gradient(135deg, #5bc5df, #7c9ef8);
+      border: none; border-radius: 9px;
+      color: #fff; font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+      margin-top: 20px;
+    }
+    .generate-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .generate-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    /* ── Results card ── */
+    .results-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+      display: none;
+    }
+    .results-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .results-header h2 { font-size: 15px; font-weight: 700; }
+    .copy-all-btn {
+      font-size: 12px; font-weight: 600;
+      padding: 6px 14px; border-radius: 7px;
+      background: rgba(91,197,223,0.12); border: 1px solid rgba(91,197,223,0.25);
+      color: var(--teal); cursor: pointer; font-family: inherit;
+      transition: background 0.15s;
+    }
+    .copy-all-btn:hover { background: rgba(91,197,223,0.2); }
+
+    .names-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .name-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 12px;
+      font-size: 12px; font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--text); gap: 8px;
+      transition: border-color 0.15s;
+    }
+    .name-item:hover { border-color: var(--border2); }
+    .name-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .copy-btn {
+      font-size: 11px; color: var(--sub); background: none; border: none;
+      cursor: pointer; padding: 2px 4px; border-radius: 4px;
+      flex-shrink: 0; transition: color 0.15s;
+      font-family: inherit;
+    }
+    .copy-btn:hover { color: var(--teal); }
+    .copy-btn.copied { color: var(--green); }
+
+    .error-msg {
+      background: rgba(240,122,122,0.1); border: 1px solid rgba(240,122,122,0.25);
+      color: #f07a7a; border-radius: 9px; padding: 12px 16px;
+      font-size: 13px; display: none; margin-top: 12px;
+    }
+    .spinner {
+      display: none; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite; margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="back">← Home</a>
+    <div class="page-title">
+      <div class="page-icon">🏷️</div>
+      <div>
+        <h1>Sample Name Generator</h1>
+        <p>Generate creative names for your sample packs</p>
+      </div>
+    </div>
+    <div style="width:80px"></div>
+  </header>
+
+  <div class="main">
+
+    <div class="form-card">
+
+      <!-- Instrument type chips -->
+      <div class="section-label">Instrument / Type</div>
+      <div class="chip-group" id="instr-chips">
+        <button class="chip active" data-val="Kick">Kick</button>
+        <button class="chip" data-val="Snare">Snare</button>
+        <button class="chip" data-val="Hi-Hat">Hi-Hat</button>
+        <button class="chip" data-val="Clap">Clap</button>
+        <button class="chip" data-val="Perc">Perc</button>
+        <button class="chip" data-val="Bass">Bass</button>
+        <button class="chip" data-val="Lead Synth">Lead</button>
+        <button class="chip" data-val="Pad">Pad</button>
+        <button class="chip" data-val="Pluck">Pluck</button>
+        <button class="chip" data-val="FX / Riser">FX</button>
+        <button class="chip" data-val="Loop">Loop</button>
+        <button class="chip" data-val="Vocal Chop">Vocal</button>
+        <button class="chip" data-val="Guitar">Guitar</button>
+        <button class="chip" data-val="Piano">Piano</button>
+        <button class="chip" data-val="Strings">Strings</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Genre</label>
+          <select id="genre">
+            <option>Trap</option>
+            <option>Boom Bap</option>
+            <option>Lo-Fi</option>
+            <option>House</option>
+            <option>Techno</option>
+            <option>Drum & Bass</option>
+            <option>Jungle</option>
+            <option>Afrobeat</option>
+            <option>R&B / Soul</option>
+            <option>Ambient</option>
+            <option>Pop</option>
+            <option>Rock</option>
+            <option>Jazz</option>
+            <option>Cinematic</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Mood / Vibe</label>
+          <select id="mood">
+            <option>Dark</option>
+            <option>Bright</option>
+            <option>Chill</option>
+            <option>Aggressive</option>
+            <option>Dreamy</option>
+            <option>Melancholic</option>
+            <option>Euphoric</option>
+            <option>Mysterious</option>
+            <option>Punchy</option>
+            <option>Smooth</option>
+            <option>Raw / Gritty</option>
+            <option>Warm</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:100px">
+          <label>Key (opt.)</label>
+          <input id="key" type="text" placeholder="e.g. Am" maxlength="5" />
+        </div>
+        <div class="field" style="max-width:90px">
+          <label>BPM (opt.)</label>
+          <input id="bpm" type="number" placeholder="140" min="40" max="300" />
+        </div>
+        <div class="field" style="max-width:90px">
+          <label>Count</label>
+          <select id="count">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="30">30</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="generate-btn" id="gen-btn" onclick="generate()">
+        <span id="btn-label">Generate Names</span>
+        <div class="spinner" id="btn-spinner"></div>
+      </button>
+
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="results-card" id="results-card">
+      <div class="results-header">
+        <h2 id="results-title">Generated Names</h2>
+        <button class="copy-all-btn" onclick="copyAll()">Copy All</button>
+      </div>
+      <div class="names-grid" id="names-grid"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // Chip selection
+    document.querySelectorAll('#instr-chips .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#instr-chips .chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+
+    function getInstrument() {
+      const active = document.querySelector('#instr-chips .chip.active');
+      return active ? active.dataset.val : 'Kick';
+    }
+
+    async function generate() {
+      const btn = document.getElementById('gen-btn');
+      const label = document.getElementById('btn-label');
+      const spinner = document.getElementById('btn-spinner');
+      const errorMsg = document.getElementById('error-msg');
+
+      btn.disabled = true;
+      label.style.display = 'none';
+      spinner.style.display = 'block';
+      errorMsg.style.display = 'none';
+
+      const fd = new FormData();
+      fd.append('instrument', getInstrument());
+      fd.append('genre', document.getElementById('genre').value);
+      fd.append('mood', document.getElementById('mood').value);
+      fd.append('key', document.getElementById('key').value);
+      fd.append('bpm', document.getElementById('bpm').value);
+      fd.append('count', document.getElementById('count').value);
+
+      try {
+        const res = await fetch('/generate-sample-names', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        renderNames(data.names);
+      } catch (e) {
+        errorMsg.textContent = '❌ ' + e.message;
+        errorMsg.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        label.style.display = 'block';
+        spinner.style.display = 'none';
+      }
+    }
+
+    function renderNames(names) {
+      const card = document.getElementById('results-card');
+      const grid = document.getElementById('names-grid');
+      const title = document.getElementById('results-title');
+
+      title.textContent = `${names.length} Names Generated`;
+      grid.innerHTML = '';
+      names.forEach((name, i) => {
+        const item = document.createElement('div');
+        item.className = 'name-item';
+        item.innerHTML = `
+          <span class="name-text" title="${name}">${name}</span>
+          <button class="copy-btn" id="copy-${i}" onclick="copyName('${name}', ${i})">Copy</button>
+        `;
+        grid.appendChild(item);
+      });
+      card.style.display = 'block';
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function copyName(name, idx) {
+      navigator.clipboard.writeText(name).then(() => {
+        const btn = document.getElementById(`copy-${idx}`);
+        btn.textContent = '✓';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+      });
+    }
+
+    function copyAll() {
+      const names = [...document.querySelectorAll('.name-text')].map(el => el.textContent).join('\n');
+      navigator.clipboard.writeText(names).then(() => {
+        const btn = document.querySelector('.copy-all-btn');
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = orig, 1800);
+      });
+    }
+  </script>
+</body>
+</html>

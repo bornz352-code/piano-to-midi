@@ -1,0 +1,26 @@
+services:
+
+  # ── Web UI ────────────────────────────────────────────────────────────────
+  piano-web:
+    build: .
+    command: python main.py
+    ports:
+      - "5050:5050"
+    volumes:
+      - /volume1/piano/input:/input
+      - /volume1/piano/output:/output
+    environment:
+      - PIANO_PASSWORD=changeme        # ← change this!
+    restart: unless-stopped
+
+  # ── Watchdog (folder → MIDI auto-converter) ───────────────────────────────
+  piano-watch:
+    build: .
+    command: python watchdog_service.py
+    volumes:
+      - /volume1/piano/input:/input
+      - /volume1/piano/output:/output
+    environment:
+      - INPUT_DIR=/input
+      - OUTPUT_DIR=/output
+    restart: unless-stopped

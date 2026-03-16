@@ -4,223 +4,392 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Piano → MIDI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:     #1e1e2e;
-      --panel:  #313244;
-      --border: #45475a;
-      --text:   #cdd6f4;
-      --sub:    #6c7086;
-      --accent: #89b4fa;
-      --green:  #a6e3a1;
-      --red:    #f38ba8;
-      --peach:  #fab387;
-      --radius: 10px;
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #22243a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.12);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --accent:  #7c9ef8;
+      --accent2: #a5b8fb;
+      --green:   #6fcf97;
+      --red:     #eb6f7a;
+      --peach:   #f0a07a;
+      --purple:  #b39ddb;
+      --r:       12px;
     }
+
+    html { font-size: 14px; }
 
     body {
       background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 40% at 15% 20%, rgba(124,158,248,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 85% 80%, rgba(111,207,151,0.05) 0%, transparent 70%);
       color: var(--text);
       font-family: "Inter", system-ui, sans-serif;
-      font-size: 14px;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px 20px;
+      padding: 48px 16px 80px;
     }
 
-    h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-    .subtitle { color: var(--sub); margin-top: 4px; margin-bottom: 32px; }
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      width: 100%; max-width: 660px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 40px;
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #7c9ef8, #6fcf97);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; box-shadow: 0 4px 16px rgba(124,158,248,0.35);
+    }
+    .logo-text h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-text p { font-size: 12px; color: var(--sub); margin-top: 1px; }
+    .signout {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+    }
+    .signout:hover { color: var(--text); border-color: var(--border2); }
 
+    /* ── Card ───────────────────────────────────────────── */
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      width: 100%;
-      max-width: 600px;
-      margin-bottom: 16px;
+      border-radius: var(--r);
+      padding: 24px;
+      width: 100%; max-width: 660px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.7px;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .card-title::before {
+      content: ''; display: block; width: 3px; height: 14px;
+      background: var(--accent); border-radius: 2px;
     }
 
-    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 18px; color: var(--accent); }
+    /* ── Tabs ───────────────────────────────────────────── */
+    .tabs {
+      display: flex; background: var(--surface); border-radius: 8px;
+      padding: 3px; gap: 2px; margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1; padding: 8px; font-size: 13px; font-weight: 500;
+      color: var(--sub); border: none; background: none; cursor: pointer;
+      border-radius: 6px; transition: all 0.15s;
+    }
+    .tab.active {
+      background: var(--panel); color: var(--text);
+      box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
 
-    .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-
+    /* ── Drop zone ──────────────────────────────────────── */
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      text-align: center;
-      cursor: pointer;
+      border: 1.5px dashed rgba(124,158,248,0.25);
+      border-radius: 10px; padding: 32px 20px;
+      text-align: center; cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
+      background: rgba(124,158,248,0.03);
+      margin-bottom: 20px;
     }
-    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(137,180,250,0.05); }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(124,158,248,0.07);
+    }
     .drop-zone input[type=file] { display: none; }
-    .drop-zone .icon { font-size: 32px; margin-bottom: 8px; }
-    .drop-zone .hint { color: var(--sub); font-size: 12px; margin-top: 4px; }
-    .drop-zone .filename { color: var(--green); font-size: 13px; margin-top: 8px; word-break: break-all; }
+    .dz-icon {
+      width: 48px; height: 48px; border-radius: 12px; margin: 0 auto 12px;
+      background: linear-gradient(135deg, rgba(124,158,248,0.2), rgba(111,207,151,0.1));
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .dz-text { font-size: 14px; font-weight: 500; color: var(--text); }
+    .dz-hint { font-size: 12px; color: var(--sub); margin-top: 4px; }
+    .dz-file {
+      margin-top: 10px; font-size: 13px; font-weight: 500;
+      color: var(--green); display: none;
+      padding: 6px 10px; background: rgba(111,207,151,0.1);
+      border-radius: 6px; display: none; align-items: center; gap: 6px;
+      justify-content: center;
+    }
+    .dz-file.visible { display: flex; }
 
-    input[type=number] {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      padding: 7px 10px;
-      font-size: 14px;
-      width: 90px;
+    /* ── Fields ─────────────────────────────────────────── */
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block; font-size: 11px; font-weight: 600; color: var(--sub);
+      text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px;
     }
 
+    /* BPM row */
+    .bpm-row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .bpm-field { display: flex; align-items: center; gap: 0; }
+    .bpm-field button {
+      width: 32px; height: 36px; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 16px; cursor: pointer; transition: background 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bpm-field button:first-child { border-radius: 7px 0 0 7px; border-right: none; }
+    .bpm-field button:last-child  { border-radius: 0 7px 7px 0; border-left: none; }
+    .bpm-field button:hover { background: var(--panel); }
+    .bpm-field input[type=number] {
+      width: 60px; height: 36px; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 14px; font-weight: 600; text-align: center;
+      -moz-appearance: textfield; border-radius: 0;
+    }
+    .bpm-field input[type=number]::-webkit-inner-spin-button,
+    .bpm-field input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .bpm-status { font-size: 11px; color: var(--sub); margin-bottom: 4px; }
+
+    /* ── Buttons ────────────────────────────────────────── */
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 18px;
-      border: none;
-      border-radius: 7px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 20px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.15s, opacity 0.15s;
+      text-decoration: none; white-space: nowrap;
     }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #11111b; }
-    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
-    .btn-record { background: var(--red); color: #11111b; }
-    .btn-record.active { background: var(--border); color: var(--text); }
-    .btn-download { background: var(--green); color: #11111b; display: none; }
-
-    .progress-wrap { margin-top: 18px; }
-    .progress-bar-bg {
-      background: var(--bg);
-      border-radius: 99px;
-      height: 6px;
-      overflow: hidden;
-      margin-bottom: 8px;
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, #7c9ef8, #6a8de8);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(124,158,248,0.35);
     }
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 99px;
-      width: 0%;
-      transition: width 0.3s;
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(124,158,248,0.5); }
+    .btn-record {
+      background: linear-gradient(135deg, #eb6f7a, #d9606a);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(235,111,122,0.35);
     }
-    .progress-msg { color: var(--sub); font-size: 12px; min-height: 18px; }
-
-    /* Piano roll */
-    .roll-wrap { margin-top: 20px; }
-    .roll-wrap h3 { font-size: 12px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    .roll-container {
-      display: flex; border-radius: 6px; overflow: hidden;
+    .btn-record.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: none;
       border: 1px solid var(--border);
     }
-    .piano-keys { flex-shrink: 0; width: 36px; background: var(--panel); }
+    .btn-download {
+      background: linear-gradient(135deg, #6fcf97, #5ab87f);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(111,207,151,0.3);
+      display: none;
+    }
+    .btn-download.visible { display: inline-flex; }
+
+    /* ── Progress ───────────────────────────────────────── */
+    .progress-wrap { margin-top: 20px; }
+    .progress-track {
+      background: var(--surface); border-radius: 99px;
+      height: 4px; overflow: hidden; margin-bottom: 9px;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%; border-radius: 99px; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      transition: width 0.35s ease;
+      position: relative; overflow: hidden;
+    }
+    .progress-fill::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .progress-msg { font-size: 12px; color: var(--sub); min-height: 16px; }
+
+    /* ── Piano roll ─────────────────────────────────────── */
+    .roll-wrap { margin-top: 24px; }
+    .roll-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .roll-header span { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; }
+    .roll-stats { font-size: 11px; color: var(--sub); }
+    .roll-container {
+      display: flex; border-radius: 8px; overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
     .roll-scroll { overflow-x: auto; flex: 1; }
+    .roll-scroll::-webkit-scrollbar { height: 4px; }
+    .roll-scroll::-webkit-scrollbar-track { background: var(--surface); }
+    .roll-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
     canvas { display: block; }
 
-    /* Recording indicator */
+    /* ── History ────────────────────────────────────────── */
+    .history-list { display: flex; flex-direction: column; gap: 8px; }
+    .history-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; transition: border-color 0.15s;
+    }
+    .history-item:hover { border-color: var(--border2); }
+    .history-icon {
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(124,158,248,0.2), rgba(179,157,219,0.15));
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .history-info { flex: 1; min-width: 0; }
+    .history-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-meta { font-size: 11px; color: var(--sub); margin-top: 2px; }
+    .history-dl {
+      padding: 5px 10px; font-size: 12px;
+      background: rgba(111,207,151,0.12); color: var(--green);
+      border: 1px solid rgba(111,207,151,0.2); border-radius: 6px;
+      text-decoration: none; font-weight: 600; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .history-dl:hover { background: rgba(111,207,151,0.22); }
+
+    /* ── Recording ──────────────────────────────────────── */
     .rec-dot {
-      width: 10px; height: 10px;
-      background: var(--red);
-      border-radius: 50%;
-      display: inline-block;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #fff; display: inline-block;
       animation: blink 1s infinite;
     }
     @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+    .timer {
+      font-size: 40px; font-weight: 700; text-align: center;
+      letter-spacing: 4px; color: var(--red); margin: 20px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .rec-idle { text-align: center; padding: 24px 0; }
+    .rec-idle p { font-size: 13px; color: var(--sub); margin-top: 8px; }
 
-    .timer { font-size: 22px; font-weight: 700; color: var(--red); text-align: center; margin: 12px 0; letter-spacing: 2px; }
-    .row { display: flex; gap: 12px; align-items: center; }
+    /* ── Divider ────────────────────────────────────────── */
+    .divider { width: 100%; max-width: 660px; height: 1px; background: var(--border); margin: 6px 0 14px; }
+
+    /* ── Action row ─────────────────────────────────────── */
+    .action-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <div style="position:fixed;top:16px;right:20px">
-    <a href="/logout" style="color:var(--sub);font-size:12px;text-decoration:none">Sign out</a>
-  </div>
-  <h1>Piano → MIDI</h1>
-  <p class="subtitle">Convert piano audio to a MIDI file</p>
 
-  <!-- ── Convert File ─────────────────────────────────────── -->
-  <div class="card" id="convert-card">
-    <h2>Convert Audio File</h2>
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎹</div>
+      <div class="logo-text">
+        <h1>Piano → MIDI</h1>
+        <p>Polyphonic audio transcription</p>
+      </div>
+    </div>
+    <a href="/logout" class="signout">Sign out</a>
+  </header>
 
-    <div class="field">
-      <label>Audio file (WAV, MP3, FLAC, OGG…)</label>
+  <!-- ── Main convert card ─────────────────────────────── -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('file', this)">Convert File</button>
+      <button class="tab" onclick="switchTab('rec', this)">Record & Convert</button>
+    </div>
+
+    <!-- File tab -->
+    <div class="tab-panel active" id="tab-file">
       <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
         <input type="file" id="file-input" accept=".wav,.mp3,.flac,.ogg,.aiff,.m4a,.mp4,.mov,.mkv,audio/*,video/*" />
-        <div class="icon">🎹</div>
-        <div>Drop file here or click to browse</div>
-        <div class="hint">Audio or video: WAV, MP3, FLAC, MP4, MOV… — monophonic piano works best</div>
-        <div class="filename" id="filename"></div>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="field" style="margin:0">
-        <label>Tempo (BPM) <span id="bpm-status" style="color:var(--sub);font-size:11px"></span></label>
-        <input type="number" id="tempo" value="120" min="20" max="300" />
-      </div>
-      <button class="btn btn-primary" id="convert-btn" onclick="startConvert()" disabled>Convert to MIDI</button>
-      <a class="btn btn-download" id="download-btn" download="output.mid">⬇ Download MIDI</a>
-    </div>
-
-    <div class="progress-wrap" id="convert-progress" style="display:none">
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="convert-bar"></div></div>
-      <div class="progress-msg" id="convert-msg"></div>
-    </div>
-
-    <div class="roll-wrap" id="roll-wrap" style="display:none">
-      <h3>Piano Roll</h3>
-      <div class="roll-container">
-        <canvas id="roll-keys"></canvas>
-        <div class="roll-scroll" id="roll-scroll">
-          <canvas id="roll"></canvas>
+        <div class="dz-icon">🎵</div>
+        <div class="dz-text">Drop your file here</div>
+        <div class="dz-hint">WAV · MP3 · FLAC · MP4 · MOV and more</div>
+        <div class="dz-file" id="dz-file">
+          <span>✓</span><span id="filename"></span>
         </div>
       </div>
+
+      <div class="bpm-row">
+        <div class="field" style="margin:0">
+          <label>Tempo (BPM)</label>
+          <div class="bpm-status" id="bpm-status"></div>
+          <div class="bpm-field">
+            <button onclick="stepBpm(-1)">−</button>
+            <input type="number" id="tempo" value="120" min="20" max="300" />
+            <button onclick="stepBpm(1)">+</button>
+          </div>
+        </div>
+        <div class="action-row" style="margin-top:22px">
+          <button class="btn btn-primary" id="convert-btn" onclick="startConvert()" disabled>Convert to MIDI</button>
+          <a class="btn btn-download" id="download-btn" download="output.mid">⬇ Download</a>
+        </div>
+      </div>
+
+      <div class="progress-wrap" id="convert-progress" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="convert-bar"></div></div>
+        <div class="progress-msg" id="convert-msg"></div>
+      </div>
+
     </div>
-  </div>
 
-  <!-- ── History ─────────────────────────────────────────── -->
-  <div class="card" id="history-card" style="display:none">
-    <h2>Recent Conversions</h2>
-    <table id="history-table" style="width:100%;border-collapse:collapse">
-      <thead>
-        <tr style="color:var(--sub);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">
-          <th style="text-align:left;padding:0 0 10px">File</th>
-          <th style="text-align:right;padding:0 0 10px">Notes</th>
-          <th style="text-align:right;padding:0 0 10px">Time</th>
-          <th style="padding:0 0 10px"></th>
-        </tr>
-      </thead>
-      <tbody id="history-body"></tbody>
-    </table>
-  </div>
+    <!-- Record tab -->
+    <div class="tab-panel" id="tab-rec">
+      <div class="rec-idle" id="rec-idle">
+        <button class="btn btn-record" id="rec-btn" onclick="toggleRecord()">⏺ Start Recording</button>
+        <p>Click to record from your microphone</p>
+      </div>
 
-  <!-- ── Record & Convert ─────────────────────────────────── -->
-  <div class="card" id="record-card">
-    <h2>Record & Convert</h2>
+      <div id="rec-active" style="display:none; text-align:center">
+        <div class="timer" id="timer">0:00</div>
+        <button class="btn btn-record active" id="rec-stop-btn" onclick="toggleRecord()">
+          <span class="rec-dot"></span> Stop Recording
+        </button>
+      </div>
 
-    <div class="timer" id="timer" style="display:none">0:00</div>
-
-    <div class="row" style="margin-bottom:16px">
-      <button class="btn btn-record" id="rec-btn" onclick="toggleRecord()">⏺ Start Recording</button>
-      <div class="field" style="margin:0">
+      <div class="field" style="margin-top:20px">
         <label>Tempo (BPM)</label>
-        <input type="number" id="rec-tempo" value="120" min="20" max="300" />
+        <div class="bpm-field">
+          <button onclick="stepBpm2(-1)">−</button>
+          <input type="number" id="rec-tempo" value="120" min="20" max="300" />
+          <button onclick="stepBpm2(1)">+</button>
+        </div>
+      </div>
+
+      <div class="progress-wrap" id="rec-progress" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="rec-bar"></div></div>
+        <div class="progress-msg" id="rec-msg"></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <a class="btn btn-download" id="rec-download-btn" download="output.mid">⬇ Download</a>
       </div>
     </div>
+  </div>
 
-    <div class="progress-wrap" id="rec-progress" style="display:none">
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="rec-bar"></div></div>
-      <div class="progress-msg" id="rec-msg"></div>
-    </div>
-
-    <a class="btn btn-download" id="rec-download-btn" download="output.mid">⬇ Download MIDI</a>
+  <!-- ── History ───────────────────────────────────────── -->
+  <div class="card" id="history-card" style="display:none">
+    <div class="card-title">Recent Conversions</div>
+    <div class="history-list" id="history-body"></div>
   </div>
 
 <script>
+// ── Tab switching ────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── BPM steppers ─────────────────────────────────────────────────────────────
+function stepBpm(d)  { const el = document.getElementById('tempo');     el.value = Math.min(300, Math.max(20, +el.value + d)); }
+function stepBpm2(d) { const el = document.getElementById('rec-tempo'); el.value = Math.min(300, Math.max(20, +el.value + d)); }
+
 // ── History ─────────────────────────────────────────────────────────────────
 async function loadHistory() {
   const resp = await fetch('/history');
@@ -230,107 +399,16 @@ async function loadHistory() {
   if (!entries.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   body.innerHTML = entries.map(e => `
-    <tr style="border-top:1px solid var(--border)">
-      <td style="padding:10px 0;font-size:13px">${e.filename}</td>
-      <td style="padding:10px 0;text-align:right;color:var(--sub);font-size:12px">${e.note_count}</td>
-      <td style="padding:10px 6px;text-align:right;color:var(--sub);font-size:12px">${e.created_at}</td>
-      <td style="padding:10px 0;text-align:right">
-        <a href="/download/${e.id}" class="btn btn-download" style="display:inline-flex;padding:5px 10px;font-size:12px">⬇</a>
-      </td>
-    </tr>`).join('');
+    <div class="history-item">
+      <div class="history-icon">🎼</div>
+      <div class="history-info">
+        <div class="history-name">${e.filename}</div>
+        <div class="history-meta">${e.note_count} notes · ${e.created_at}</div>
+      </div>
+      <a href="/download/${e.id}" class="history-dl">⬇ MIDI</a>
+    </div>`).join('');
 }
 loadHistory();
-
-// ── Piano Roll ───────────────────────────────────────────────────────────────
-const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const BLACK = new Set([1,3,6,8,10]); // semitone offsets of black keys
-
-function drawPianoRoll(notes) {
-  if (!notes || !notes.length) return;
-
-  const MIDI_MIN = Math.max(0,  Math.min(...notes.map(n => n.pitch)) - 3);
-  const MIDI_MAX = Math.min(127, Math.max(...notes.map(n => n.pitch)) + 3);
-  const ROWS     = MIDI_MAX - MIDI_MIN + 1;
-  const ROW_H    = 12;
-  const PX_PER_S = 80;
-  const duration = Math.max(...notes.map(n => n.end));
-  const W        = Math.ceil(duration * PX_PER_S);
-  const H        = ROWS * ROW_H;
-  const KEY_W    = 36;
-
-  // ── Keys canvas ──────────────────────────────────────
-  const kc = document.getElementById('roll-keys');
-  kc.width  = KEY_W;
-  kc.height = H;
-  const kx = kc.getContext('2d');
-
-  for (let midi = MIDI_MAX; midi >= MIDI_MIN; midi--) {
-    const y    = (MIDI_MAX - midi) * ROW_H;
-    const semi = midi % 12;
-    const isBlack = BLACK.has(semi);
-    kx.fillStyle = isBlack ? '#1e1e2e' : '#45475a';
-    kx.fillRect(0, y, KEY_W, ROW_H);
-    // draw C label
-    if (semi === 0) {
-      kx.fillStyle = '#89b4fa';
-      kx.font = '8px system-ui';
-      kx.textAlign = 'right';
-      kx.fillText('C' + (Math.floor(midi / 12) - 1), KEY_W - 3, y + ROW_H - 2);
-    }
-    // separator
-    kx.fillStyle = '#11111b';
-    kx.fillRect(0, y + ROW_H - 1, KEY_W, 1);
-  }
-
-  // ── Roll canvas ───────────────────────────────────────
-  const rc = document.getElementById('roll');
-  rc.width  = W;
-  rc.height = H;
-  const rx = rc.getContext('2d');
-
-  // Background rows
-  for (let midi = MIDI_MAX; midi >= MIDI_MIN; midi--) {
-    const y    = (MIDI_MAX - midi) * ROW_H;
-    const semi = midi % 12;
-    rx.fillStyle = BLACK.has(semi) ? '#1a1a2a' : '#252535';
-    rx.fillRect(0, y, W, ROW_H);
-    // Row separator
-    rx.fillStyle = '#11111b';
-    rx.fillRect(0, y + ROW_H - 1, W, 1);
-  }
-
-  // Beat grid (every second)
-  for (let s = 0; s <= duration; s++) {
-    const x = s * PX_PER_S;
-    rx.fillStyle = s % 4 === 0 ? '#45475a' : '#313244';
-    rx.fillRect(x, 0, 1, H);
-  }
-
-  // Notes
-  const palette = ['#89b4fa','#a6e3a1','#fab387','#f38ba8','#cba6f7','#94e2d5'];
-  notes.forEach(n => {
-    const y = (MIDI_MAX - n.pitch) * ROW_H;
-    const x = n.start * PX_PER_S;
-    const w = Math.max(2, (n.end - n.start) * PX_PER_S - 1);
-    const h = ROW_H - 2;
-    const r = Math.min(2, w / 2, h / 2);
-    rx.fillStyle = palette[n.pitch % palette.length];
-    rx.beginPath();
-    rx.moveTo(x + r, y + 1);
-    rx.lineTo(x + w - r, y + 1);
-    rx.arcTo(x + w, y + 1, x + w, y + 1 + r, r);
-    rx.lineTo(x + w, y + 1 + h - r);
-    rx.arcTo(x + w, y + 1 + h, x + w - r, y + 1 + h, r);
-    rx.lineTo(x + r, y + 1 + h);
-    rx.arcTo(x, y + 1 + h, x, y + 1 + h - r, r);
-    rx.lineTo(x, y + 1 + r);
-    rx.arcTo(x, y + 1, x + r, y + 1, r);
-    rx.closePath();
-    rx.fill();
-  });
-
-  document.getElementById('roll-wrap').style.display = 'block';
-}
 
 // ── State ───────────────────────────────────────────────────────────────────
 let selectedFile = null;
@@ -356,6 +434,7 @@ fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fil
 function setFile(f) {
   selectedFile = f;
   document.getElementById('filename').textContent = f.name;
+  document.getElementById('dz-file').classList.add('visible');
   document.getElementById('convert-btn').disabled = false;
   document.getElementById('download-btn').style.display = 'none';
   document.getElementById('convert-progress').style.display = 'none';
@@ -365,7 +444,7 @@ function setFile(f) {
 
 async function autoDetectBpm(f) {
   const status = document.getElementById('bpm-status');
-  status.textContent = '⏳ detecting…';
+  status.textContent = '⏳ Detecting tempo…';
   const form = new FormData();
   form.append('audio', f);
   try {
@@ -373,12 +452,12 @@ async function autoDetectBpm(f) {
     const data = await resp.json();
     if (data.bpm) {
       document.getElementById('tempo').value = data.bpm;
-      status.textContent = `✓ detected: ${data.bpm}`;
+      status.textContent = `✓ Detected ${data.bpm} BPM`;
     } else {
-      status.textContent = '⚠ could not detect';
+      status.textContent = '';
     }
   } catch {
-    status.textContent = '⚠ detection failed';
+    status.textContent = '';
   }
 }
 
@@ -398,7 +477,6 @@ async function startConvert() {
   form.append('tempo', tempo);
   form.append('job_id', jobId);
 
-  // Start polling progress
   const pollId = setInterval(async () => {
     try {
       const r = await fetch('/progress/' + jobId);
@@ -423,12 +501,7 @@ async function startConvert() {
     dl.href = url;
     dl.style.display = 'inline-flex';
     setProgress('convert', 100, '✓ Done! Click Download to save.');
-    // Fetch final progress to get notes for piano roll
-    const pr = await fetch('/progress/' + jobId);
-    const pd = await pr.json();
-    if (pd.notes && pd.notes.length) drawPianoRoll(pd.notes);
     loadHistory();
-    // Draw piano roll from response headers isn't possible, so we'll just update msg
   } catch (e) {
     clearInterval(pollId);
     setProgress('convert', 0, '❌ ' + e.message);
@@ -444,7 +517,6 @@ function setProgress(prefix, pct, msg) {
 
 // ── Record ──────────────────────────────────────────────────────────────────
 async function toggleRecord() {
-  const btn = document.getElementById('rec-btn');
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     mediaRecorder.stop();
     return;
@@ -464,17 +536,15 @@ async function toggleRecord() {
   mediaRecorder.onstop = async () => {
     stream.getTracks().forEach(t => t.stop());
     clearInterval(timerInterval);
-    btn.textContent = '⏺ Start Recording';
-    btn.classList.remove('active');
-    document.getElementById('timer').style.display = 'none';
+    document.getElementById('rec-idle').style.display = 'block';
+    document.getElementById('rec-active').style.display = 'none';
     await processRecording();
   };
 
   mediaRecorder.start(100);
-  btn.innerHTML = '<span class="rec-dot"></span> Stop Recording';
-  btn.classList.add('active');
+  document.getElementById('rec-idle').style.display = 'none';
+  document.getElementById('rec-active').style.display = 'block';
   recSeconds = 0;
-  document.getElementById('timer').style.display = 'block';
   updateTimer();
   timerInterval = setInterval(updateTimer, 1000);
 }
@@ -526,9 +596,6 @@ async function processRecording() {
     dl.href = url;
     dl.style.display = 'inline-flex';
     setProgress('rec', 100, '✓ Done! Click Download to save.');
-    const pr = await fetch('/progress/' + jobId);
-    const pd = await pr.json();
-    if (pd.notes && pd.notes.length) drawPianoRoll(pd.notes);
     loadHistory();
   } catch (e) {
     clearInterval(pollId);

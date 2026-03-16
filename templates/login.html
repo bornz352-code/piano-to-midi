@@ -3,51 +3,79 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Piano → MIDI · Login</title>
+  <title>Piano → MIDI · Sign in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #1e1e2e; --panel: #313244; --border: #45475a;
-      --text: #cdd6f4; --sub: #6c7086; --accent: #89b4fa; --red: #f38ba8;
+      --bg: #0f0f1a; --panel: #1a1b2e; --border: rgba(255,255,255,0.08);
+      --text: #e2e4f0; --sub: #6b6d8a; --accent: #7c9ef8; --red: #eb6f7a;
     }
     body {
-      background: var(--bg); color: var(--text);
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 50% at 30% 30%, rgba(124,158,248,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 60% at 70% 70%, rgba(111,207,151,0.05) 0%, transparent 70%);
+      color: var(--text);
       font-family: "Inter", system-ui, sans-serif; font-size: 14px;
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
     }
     .card {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 12px; padding: 40px 36px; width: 100%; max-width: 360px;
+      background: rgba(26,27,46,0.9);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 360px;
       text-align: center;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      backdrop-filter: blur(20px);
     }
-    h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-    .sub { color: var(--sub); font-size: 13px; margin-bottom: 28px; }
-    label { display: block; text-align: left; font-size: 12px; color: var(--sub);
-            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .logo-icon {
+      width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 18px;
+      background: linear-gradient(135deg, #7c9ef8, #6fcf97);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; box-shadow: 0 4px 20px rgba(124,158,248,0.4);
+    }
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .sub { color: var(--sub); font-size: 13px; margin-top: 4px; margin-bottom: 28px; }
+    label {
+      display: block; text-align: left; font-size: 11px; font-weight: 600;
+      color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px;
+    }
     input[type=password] {
-      width: 100%; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 7px; color: var(--text); padding: 10px 12px;
-      font-size: 14px; margin-bottom: 18px; outline: none;
+      width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); padding: 11px 14px;
+      font-size: 14px; margin-bottom: 16px; outline: none; font-family: inherit;
+      transition: border-color 0.2s;
     }
     input[type=password]:focus { border-color: var(--accent); }
     button {
-      width: 100%; background: var(--accent); color: #11111b; border: none;
-      border-radius: 7px; padding: 10px; font-size: 14px; font-weight: 600;
-      cursor: pointer;
+      width: 100%;
+      background: linear-gradient(135deg, #7c9ef8, #6a8de8);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 14px rgba(124,158,248,0.4);
+      transition: box-shadow 0.15s, transform 0.1s;
+      font-family: inherit;
     }
-    button:hover { opacity: 0.9; }
-    .error { color: var(--red); font-size: 13px; margin-bottom: 14px; }
+    button:hover { box-shadow: 0 4px 22px rgba(124,158,248,0.55); }
+    button:active { transform: scale(0.98); }
+    .error {
+      color: var(--red); font-size: 12px; margin-bottom: 14px;
+      padding: 8px 10px; background: rgba(235,111,122,0.1);
+      border: 1px solid rgba(235,111,122,0.2); border-radius: 7px;
+    }
   </style>
 </head>
 <body>
   <div class="card">
+    <div class="logo-icon">🎹</div>
     <h1>Piano → MIDI</h1>
-    <p class="sub">Enter your password to continue</p>
+    <p class="sub">Sign in to continue</p>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <form method="post">
       <label for="password">Password</label>
-      <input type="password" id="password" name="password" autofocus autocomplete="current-password" />
-      <button type="submit">Sign in</button>
+      <input type="password" id="password" name="password" autofocus autocomplete="current-password" placeholder="Enter your password" />
+      <button type="submit">Sign in →</button>
     </form>
   </div>
 </body>

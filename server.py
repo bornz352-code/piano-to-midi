@@ -592,34 +592,42 @@ def _build_perc_prompt(analysis: dict, style: str, bars: int) -> str:
         else "moderate complexity, balanced" if analysis["energy_level"] == "medium"
         else "sparse and minimal"
     )
+    schema = (
+        '{\n'
+        '  "variations": [\n'
+        '    {\n'
+        '      "name": "Short creative name",\n'
+        '      "description": "One sentence about the groove",\n'
+        '      "instruments": {\n'
+        f'        "kick":         [{steps} integers 0-3 no spaces e.g. 3,0,0,1,...],\n'
+        f'        "snare":        [{steps} integers 0-3],\n'
+        f'        "hihat_closed": [{steps} integers 0-3],\n'
+        f'        "hihat_open":   [{steps} integers 0-3],\n'
+        f'        "clap":         [{steps} integers 0-3]\n'
+        '      }\n'
+        '    }\n'
+        '  ]\n'
+        '}'
+    )
     return (
         f"You are an expert music producer. I analyzed a reference audio track:\n"
         f"BPM: {analysis['bpm']}\n"
         f"Energy: {analysis['energy_level']}\n"
         f"Groove: {analysis['groove_feel']}\n"
-        f"Frequency character: {analysis['freq_character']} ({analysis['dominant_freq_hz']}Hz spectral centroid)\n"
+        f"Frequency character: {analysis['freq_character']} ({analysis['dominant_freq_hz']}Hz centroid)\n"
         f"Rhythmic density: {analysis['rhythmic_density']} onsets/sec\n"
         f"Style: {style}\n"
         f"Bars: {bars} ({steps} 16th-note steps per instrument)\n\n"
         f"Generate exactly 4 unique percussion loop variations that COMPLEMENT this track.\n"
-        f"Rules:\n"
         f"- Match BPM exactly: {analysis['bpm']}\n"
         f"- Groove: {groove_note}\n"
         f"- Energy: {density_note}\n"
         f"- Each variation must have a clearly distinct character\n\n"
-        f"Velocity codes: 0=silent, 1=ghost note (soft), 2=normal hit, 3=accent (loud)\n\n"
-        f"Return ONLY valid JSON in this exact format (no markdown, no explanation):\n"
-        '{{\n  "variations": [\n    {{\n'
-        '      "name": "Short creative name",\n'
-        '      "description": "One sentence about the groove",\n'
-        '      "instruments": {{\n'
-        f'        "kick":         [exactly {steps} integers 0-3],\n'
-        f'        "snare":        [exactly {steps} integers 0-3],\n'
-        f'        "hihat_closed": [exactly {steps} integers 0-3],\n'
-        f'        "hihat_open":   [exactly {steps} integers 0-3],\n'
-        f'        "clap":         [exactly {steps} integers 0-3]\n'
-        '      }}\n    }}\n  ]\n}}\n'
-        "Generate exactly 4 variations."
+        f"Velocity: 0=silent 1=ghost 2=normal 3=accent\n"
+        f"IMPORTANT: Each array must have EXACTLY {steps} integers. Use no spaces in arrays.\n\n"
+        f"Return ONLY a raw JSON object (no markdown, no explanation):\n"
+        + schema
+        + "\n\nGenerate exactly 4 variations."
     )
 
 
@@ -754,10 +762,13 @@ def perc_generate():
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model="claude-opus-4-6",
-            max_tokens=2048,
+            max_tokens=4096,
             messages=[{"role": "user", "content": _build_perc_prompt(analysis, style, bars)}],
         )
         text = msg.content[0].text.strip()
+        # Strip markdown code fences if present
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
         match = re.search(r"\{[\s\S]*\}", text)
         if not match:
             return jsonify({"error": "Could not parse patterns from Claude."}), 500

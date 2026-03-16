@@ -299,7 +299,8 @@
   <div class="card">
     <div class="tabs">
       <button class="tab active" onclick="switchTab('file', this)">Convert File</button>
-      <button class="tab" onclick="switchTab('rec', this)">Record & Convert</button>
+      <button class="tab" onclick="switchTab('url', this)">URL</button>
+      <button class="tab" onclick="switchTab('rec', this)">Record</button>
     </div>
 
     <!-- File tab -->
@@ -335,6 +336,50 @@
         <div class="progress-msg" id="convert-msg"></div>
       </div>
 
+    </div>
+
+    <!-- URL tab -->
+    <div class="tab-panel" id="tab-url">
+      <div class="field">
+        <label>Instagram / YouTube / SoundCloud URL</label>
+        <div style="display:flex;gap:8px">
+          <input type="url" id="url-input" placeholder="https://www.instagram.com/p/…"
+            style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:14px;outline:none;font-family:inherit" />
+          <button class="btn btn-primary" id="url-fetch-btn" onclick="fetchUrl()">Load</button>
+        </div>
+      </div>
+
+      <div id="url-player" style="display:none">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
+          <div id="url-title" style="font-size:13px;font-weight:600;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+          <audio id="audio-player" controls style="width:100%;height:36px"></audio>
+        </div>
+
+        <div class="bpm-row">
+          <div class="field" style="margin:0">
+            <label>Tempo (BPM)</label>
+            <div class="bpm-field">
+              <button onclick="stepBpm3(-1)">−</button>
+              <input type="number" id="url-tempo" value="120" min="20" max="300" />
+              <button onclick="stepBpm3(1)">+</button>
+            </div>
+          </div>
+          <div class="action-row" style="margin-top:22px">
+            <button class="btn btn-primary" id="url-convert-btn" onclick="convertUrl()">Convert to MIDI</button>
+            <a class="btn btn-download" id="url-download-btn" download="output.mid">⬇ Download</a>
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="url-progress" style="display:none">
+          <div class="progress-track"><div class="progress-fill" id="url-bar"></div></div>
+          <div class="progress-msg" id="url-msg"></div>
+        </div>
+      </div>
+
+      <div id="url-fetch-progress" style="display:none;margin-top:12px">
+        <div class="progress-track"><div class="progress-fill" id="url-fetch-bar" style="width:100%;animation:shimmer 1.5s infinite"></div></div>
+        <div class="progress-msg" id="url-fetch-msg">Fetching audio…</div>
+      </div>
     </div>
 
     <!-- Record tab -->
@@ -389,6 +434,96 @@ function switchTab(name, btn) {
 // ── BPM steppers ─────────────────────────────────────────────────────────────
 function stepBpm(d)  { const el = document.getElementById('tempo');     el.value = Math.min(300, Math.max(20, +el.value + d)); }
 function stepBpm2(d) { const el = document.getElementById('rec-tempo'); el.value = Math.min(300, Math.max(20, +el.value + d)); }
+function stepBpm3(d) { const el = document.getElementById('url-tempo'); el.value = Math.min(300, Math.max(20, +el.value + d)); }
+
+// ── URL fetch & play ─────────────────────────────────────────────────────────
+let currentAudioId = null;
+
+async function fetchUrl() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+
+  document.getElementById('url-fetch-btn').disabled = true;
+  document.getElementById('url-player').style.display = 'none';
+  document.getElementById('url-fetch-progress').style.display = 'block';
+  document.getElementById('url-fetch-msg').textContent = 'Fetching audio… (may take a few seconds)';
+
+  try {
+    const resp = await fetch('/fetch-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      document.getElementById('url-fetch-msg').textContent = '❌ ' + (data.error || 'Failed to fetch');
+      return;
+    }
+    currentAudioId = data.id;
+    document.getElementById('url-title').textContent = data.title || 'Audio';
+    document.getElementById('audio-player').src = '/stream/' + data.id;
+    document.getElementById('url-player').style.display = 'block';
+    document.getElementById('url-fetch-progress').style.display = 'none';
+    document.getElementById('url-download-btn').style.display = 'none';
+  } catch (e) {
+    document.getElementById('url-fetch-msg').textContent = '❌ ' + e.message;
+  } finally {
+    document.getElementById('url-fetch-btn').disabled = false;
+  }
+}
+
+async function convertUrl() {
+  if (!currentAudioId) return;
+  const jobId = 'url_' + Date.now();
+  const tempo = document.getElementById('url-tempo').value;
+
+  document.getElementById('url-convert-btn').disabled = true;
+  document.getElementById('url-download-btn').style.display = 'none';
+  document.getElementById('url-progress').style.display = 'block';
+  setProgress('url', 5, 'Starting…');
+
+  const form = new FormData();
+  form.append('audio_id', currentAudioId);
+  form.append('tempo', tempo);
+  form.append('job_id', jobId);
+
+  const pollId = setInterval(async () => {
+    try {
+      const r = await fetch('/progress/' + jobId);
+      const d = await r.json();
+      setProgress('url', d.pct, d.msg);
+      if (d.done) clearInterval(pollId);
+    } catch {}
+  }, 400);
+
+  try {
+    const resp = await fetch('/convert-url', { method: 'POST', body: form });
+    clearInterval(pollId);
+    if (!resp.ok) {
+      const d = await resp.json();
+      setProgress('url', 0, '❌ ' + (d.error || 'Failed'));
+      return;
+    }
+    const blob = await resp.blob();
+    const dl = document.getElementById('url-download-btn');
+    dl.href = URL.createObjectURL(blob);
+    dl.style.display = 'inline-flex';
+    setProgress('url', 100, '✓ Done! Click Download to save.');
+    loadHistory();
+  } catch (e) {
+    clearInterval(pollId);
+    setProgress('url', 0, '❌ ' + e.message);
+  } finally {
+    document.getElementById('url-convert-btn').disabled = false;
+  }
+}
+
+// Allow pressing Enter in the URL field
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fetchUrl();
+  });
+});
 
 // ── History ─────────────────────────────────────────────────────────────────
 async function loadHistory() {

@@ -155,6 +155,7 @@
     .card-perc::before   { background: linear-gradient(90deg, #f0a07a, #6fcf97); }
     .card-oneshot::before{ background: linear-gradient(90deg, #f0a07a, #b39ddb); }
     .card-names::before  { background: linear-gradient(90deg, #00d4ff, #7c9ef8); }
+    .card-crate::before  { background: linear-gradient(90deg, #f5c842, #f0a07a); }
 
     .tool-icon {
       width: 60px; height: 60px; border-radius: 16px;
@@ -166,6 +167,7 @@
     .icon-perc   { background: linear-gradient(135deg, rgba(240,160,122,0.25), rgba(111,207,151,0.15)); }
     .icon-oneshot{ background: linear-gradient(135deg, rgba(240,160,122,0.25), rgba(179,157,219,0.15)); }
     .icon-names  { background: linear-gradient(135deg, rgba(0,212,255,0.25), rgba(124,158,248,0.15)); }
+    .icon-crate  { background: linear-gradient(135deg, rgba(245,200,66,0.25), rgba(240,160,122,0.15)); }
 
     .tool-body { flex: 1; }
     .tool-name {
@@ -187,6 +189,7 @@
     .card-perc   .cta-label { color: #f0a07a; }
     .card-oneshot .cta-label { color: var(--peach); }
     .card-names  .cta-label { color: #00d4ff; }
+    .card-crate  .cta-label { color: #f5c842; }
     .cta-arrow { font-size: 18px; transition: transform 0.18s; }
     .tool-card:hover .cta-arrow { transform: translateX(5px); }
 
@@ -204,6 +207,8 @@
     .card-perc   .feat-pill { color: rgba(240,160,122,0.85); border-color: rgba(240,160,122,0.2); background: rgba(240,160,122,0.08); }
     .card-oneshot .feat-pill{ color: rgba(240,160,122,0.85); border-color: rgba(240,160,122,0.2); background: rgba(240,160,122,0.08); }
     .card-names  .feat-pill { color: rgba(0,212,255,0.85);   border-color: rgba(0,212,255,0.2);   background: rgba(0,212,255,0.08); }
+    .card-crate  .feat-pill { color: rgba(245,200,66,0.85);  border-color: rgba(245,200,66,0.2);  background: rgba(245,200,66,0.08); }
+    .card-crate::after { box-shadow: inset 0 0 40px rgba(245,200,66,0.06); }
   </style>
 </head>
 <body>
@@ -325,6 +330,27 @@
       </div>
       <div class="tool-cta">
         <span class="cta-label">Open tool</span>
+        <span class="cta-arrow">→</span>
+      </div>
+    </a>
+
+    <a href="/crate-digger" class="tool-card card-crate wide">
+      <div class="tool-icon icon-crate">🎰</div>
+      <div class="tool-body">
+        <div class="tool-name">Crate Digger</div>
+        <div class="tool-desc">
+          Set your genre, decade, and mood — hit DIG. Claude generates a real crate-digger's search query and hunts down obscure, sample-worthy tracks from Archive.org, YouTube, and more. Flip potential included.
+        </div>
+        <div class="features">
+          <span class="feat-pill">Claude AI query</span>
+          <span class="feat-pill">Archive.org</span>
+          <span class="feat-pill">YouTube</span>
+          <span class="feat-pill">Flip analysis</span>
+          <span class="feat-pill">3 results</span>
+        </div>
+      </div>
+      <div class="tool-cta">
+        <span class="cta-label">Start digging</span>
         <span class="cta-arrow">→</span>
       </div>
     </a>

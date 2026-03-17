@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crate Digger · STUDIO AID</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f1a;
+      --surface: #1a1b2e;
+      --panel:   #1e2035;
+      --border:  rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.15);
+      --text:    #e2e4f0;
+      --sub:     #6b6d8a;
+      --green:   #6fcf97;
+      --brand:   #a259ff;
+      --cyan:    #00d4ff;
+      --gold:    #f5c842;
+      --grad:    linear-gradient(135deg, #a259ff, #00d4ff);
+      --r:       14px;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 70% 50% at 10% 10%, rgba(162,89,255,0.1) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 60% at 90% 85%, rgba(0,212,255,0.07) 0%, transparent 65%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 0 16px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      width: 100%; max-width: 760px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 28px;
+    }
+    .header-bar {
+      width: 100%; max-width: 760px; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(162,89,255,0.4), rgba(0,212,255,0.3), transparent);
+      margin: 16px 0 40px;
+    }
+    .back {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 7px 14px; border: 1px solid var(--border);
+      border-radius: 8px; transition: color 0.15s, border-color 0.15s; font-weight: 500;
+    }
+    .back:hover { color: var(--text); border-color: var(--border2); }
+    .logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+    .logo-icon {
+      width: 44px; height: 44px; border-radius: 13px;
+      background: var(--grad);
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+      box-shadow: 0 4px 20px rgba(162,89,255,0.4);
+    }
+    .brand-name {
+      font-size: 20px; font-weight: 900; letter-spacing: -0.4px;
+      background: var(--grad);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1;
+    }
+    .brand-by { font-size: 10px; font-weight: 600; color: var(--sub); letter-spacing: 1.3px; text-transform: uppercase; margin-top: 2px; }
+    .signout {
+      font-size: 12px; color: var(--sub); text-decoration: none;
+      padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px;
+      transition: color 0.15s, border-color 0.15s; font-weight: 500;
+    }
+    .signout:hover { color: var(--text); border-color: var(--border2); }
+
+    .main { width: 100%; max-width: 760px; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+
+    /* ── Hero ── */
+    .hero { text-align: center; margin-bottom: 8px; }
+    .hero h1 {
+      font-size: 42px; font-weight: 900; letter-spacing: -1.5px;
+      background: linear-gradient(135deg, var(--text) 30%, var(--sub));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      line-height: 1;
+    }
+    .hero p { font-size: 14px; color: var(--sub); margin-top: 8px; }
+
+    /* ── Filter card ── */
+    .filter-card {
+      width: 100%; background: var(--panel);
+      border: 1px solid var(--border); border-radius: var(--r);
+      padding: 24px 28px; box-shadow: 0 4px 28px rgba(0,0,0,0.3);
+    }
+    .filter-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+    .filter-group { flex: 1; min-width: 160px; }
+    .filter-label { font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill {
+      font-size: 12px; font-weight: 500; padding: 6px 13px; border-radius: 99px;
+      border: 1px solid var(--border); background: none; color: var(--sub);
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+    }
+    .pill:hover { border-color: var(--border2); color: var(--text); }
+    .pill.active { background: rgba(162,89,255,0.15); border-color: rgba(162,89,255,0.4); color: var(--brand); }
+
+    /* ── DIG button ── */
+    .dig-wrap { display: flex; justify-content: center; }
+    .dig-btn {
+      width: 160px; height: 160px; border-radius: 50%;
+      background: var(--grad);
+      border: none; cursor: pointer; color: #fff;
+      font-family: inherit; font-size: 22px; font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 0 0 0 rgba(162,89,255,0.5),
+                  0 8px 40px rgba(162,89,255,0.5);
+      transition: transform 0.15s, box-shadow 0.15s;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      position: relative; overflow: hidden;
+    }
+    .dig-btn::before {
+      content: '';
+      position: absolute; inset: 0; border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    }
+    .dig-btn:hover:not(:disabled) {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 12px rgba(162,89,255,0.15),
+                  0 12px 56px rgba(162,89,255,0.7);
+    }
+    .dig-btn:active:not(:disabled) { transform: scale(0.97); }
+    .dig-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .dig-btn .dig-icon { font-size: 36px; line-height: 1; }
+    .dig-btn .dig-label { font-size: 20px; font-weight: 900; letter-spacing: 2px; }
+    .dig-btn.loading .dig-icon { animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Query reveal ── */
+    .query-reveal {
+      width: 100%; background: rgba(162,89,255,0.08);
+      border: 1px solid rgba(162,89,255,0.2); border-radius: 10px;
+      padding: 14px 18px; display: none;
+    }
+    .query-reveal .q-label { font-size: 10px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .query-reveal .q-text { font-size: 15px; font-weight: 600; font-style: italic; }
+    .query-reveal .q-context { font-size: 12px; color: var(--sub); margin-top: 4px; }
+
+    /* ── Error ── */
+    .error-msg {
+      width: 100%; background: rgba(240,122,122,0.1); border: 1px solid rgba(240,122,122,0.25);
+      color: #f07a7a; border-radius: 9px; padding: 12px 16px; font-size: 13px; display: none;
+    }
+
+    /* ── Results ── */
+    .results { width: 100%; display: flex; flex-direction: column; gap: 16px; display: none; }
+
+    .result-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 24px;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.3);
+      position: relative; overflow: hidden;
+    }
+    .result-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .src-archive .result-card::before  { background: linear-gradient(90deg, #7c9ef8, #6fcf97); }
+    .src-youtube .result-card::before  { background: linear-gradient(90deg, #eb6f7a, #f0a07a); }
+    .src-freesound .result-card::before { background: linear-gradient(90deg, #6fcf97, #00d4ff); }
+
+    .result-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .result-meta { flex: 1; min-width: 0; }
+    .result-title { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .result-artist { font-size: 13px; color: var(--sub); }
+    .meta-dot { color: var(--border2); }
+    .result-year { font-size: 12px; color: var(--sub); }
+    .result-dur  { font-size: 12px; color: var(--sub); }
+
+    .source-badge {
+      font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 99px;
+      text-transform: uppercase; letter-spacing: 0.8px; flex-shrink: 0;
+    }
+    .badge-archive  { background: rgba(124,158,248,0.12); color: #7c9ef8; border: 1px solid rgba(124,158,248,0.2); }
+    .badge-youtube  { background: rgba(235,111,122,0.12); color: #eb6f7a; border: 1px solid rgba(235,111,122,0.2); }
+    .badge-freesound{ background: rgba(111,207,151,0.12); color: #6fcf97; border: 1px solid rgba(111,207,151,0.2); }
+
+    /* Why dope */
+    .why-dope {
+      background: rgba(245,200,66,0.08); border: 1px solid rgba(245,200,66,0.18);
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+      font-size: 14px; font-weight: 600; color: var(--gold); font-style: italic;
+    }
+
+    /* Flip potential */
+    .flip-section { margin-bottom: 16px; }
+    .flip-label { font-size: 10px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .flip-text { font-size: 13px; color: rgba(226,228,240,0.8); line-height: 1.6; }
+
+    /* Link */
+    .result-link {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 700; text-decoration: none;
+      padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+      color: var(--text); transition: border-color 0.15s, background 0.15s;
+    }
+    .result-link:hover { border-color: var(--border2); background: rgba(255,255,255,0.04); }
+    .src-youtube  .result-link:hover { border-color: rgba(235,111,122,0.4); }
+    .src-archive  .result-link:hover { border-color: rgba(124,158,248,0.4); }
+    .src-freesound .result-link:hover { border-color: rgba(111,207,151,0.4); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="back">← Home</a>
+    <a href="/" class="logo">
+      <div class="logo-icon">🎛️</div>
+      <div>
+        <div class="brand-name">STUDIO AID</div>
+        <div class="brand-by">by BORNZ</div>
+      </div>
+    </a>
+    <a href="/logout" class="signout">Sign out</a>
+  </header>
+  <div class="header-bar"></div>
+
+  <div class="main">
+
+    <div class="hero">
+      <h1>Crate Digger</h1>
+      <p>Set your filters, hit DIG — Claude finds your next sample to flip</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card">
+      <div class="filter-row">
+        <div class="filter-group">
+          <div class="filter-label">Genre</div>
+          <div class="pill-row" id="genre-pills">
+            <button class="pill active" data-val="surprise me">🎲 Surprise me</button>
+            <button class="pill" data-val="jazz">Jazz</button>
+            <button class="pill" data-val="soul">Soul</button>
+            <button class="pill" data-val="funk">Funk</button>
+            <button class="pill" data-val="classical">Classical</button>
+            <button class="pill" data-val="world music">World</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Decade</div>
+          <div class="pill-row" id="decade-pills">
+            <button class="pill active" data-val="random">🎲 Random</button>
+            <button class="pill" data-val="1950s">50s</button>
+            <button class="pill" data-val="1960s">60s</button>
+            <button class="pill" data-val="1970s">70s</button>
+            <button class="pill" data-val="1980s">80s</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Mood</div>
+          <div class="pill-row" id="mood-pills">
+            <button class="pill active" data-val="random">🎲 Random</button>
+            <button class="pill" data-val="upbeat">Upbeat</button>
+            <button class="pill" data-val="melancholic">Melancholic</button>
+            <button class="pill" data-val="energetic">Energetic</button>
+            <button class="pill" data-val="mellow">Mellow</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dig-wrap">
+        <button class="dig-btn" id="dig-btn" onclick="dig()">
+          <span class="dig-icon">🎵</span>
+          <span class="dig-label">DIG</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="query-reveal" id="query-reveal">
+      <div class="q-label">Searching for</div>
+      <div class="q-text" id="q-text"></div>
+      <div class="q-context" id="q-context"></div>
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <div class="results" id="results"></div>
+
+  </div>
+
+  <script>
+    // Pill group toggle
+    ['genre-pills', 'decade-pills', 'mood-pills'].forEach(groupId => {
+      document.getElementById(groupId).addEventListener('click', e => {
+        const pill = e.target.closest('.pill');
+        if (!pill) return;
+        document.querySelectorAll(`#${groupId} .pill`).forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+      });
+    });
+
+    function getFilter(groupId) {
+      const active = document.querySelector(`#${groupId} .pill.active`);
+      return active ? active.dataset.val : '';
+    }
+
+    async function dig() {
+      const btn = document.getElementById('dig-btn');
+      const errorMsg = document.getElementById('error-msg');
+      const queryReveal = document.getElementById('query-reveal');
+      const resultsDiv = document.getElementById('results');
+
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.querySelector('.dig-label').textContent = '…';
+      errorMsg.style.display = 'none';
+      queryReveal.style.display = 'none';
+      resultsDiv.style.display = 'none';
+
+      const fd = new FormData();
+      fd.append('genre',  getFilter('genre-pills'));
+      fd.append('decade', getFilter('decade-pills'));
+      fd.append('mood',   getFilter('mood-pills'));
+
+      try {
+        const res = await fetch('/crate-dig', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        // Show query
+        document.getElementById('q-text').textContent = `"${data.query}"`;
+        document.getElementById('q-context').textContent = data.context || '';
+        queryReveal.style.display = 'block';
+
+        // Render results
+        renderResults(data.results);
+
+      } catch (e) {
+        errorMsg.textContent = '❌ ' + e.message;
+        errorMsg.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.querySelector('.dig-label').textContent = 'DIG';
+      }
+    }
+
+    const SOURCE_LABELS = { 'archive.org': 'Archive.org', 'youtube': 'YouTube', 'freesound': 'Freesound' };
+    const SOURCE_CLASSES = { 'archive.org': 'archive', 'youtube': 'youtube', 'freesound': 'freesound' };
+    const SOURCE_ICONS = { 'archive.org': '📼', 'youtube': '▶️', 'freesound': '🔊' };
+
+    function renderResults(results) {
+      const div = document.getElementById('results');
+      div.innerHTML = results.map(r => {
+        const sc = SOURCE_CLASSES[r.source] || 'archive';
+        const badge = `badge-${sc}`;
+        const info = [r.artist, r.year !== '?' ? r.year : null, r.duration !== '?' ? r.duration : null]
+          .filter(Boolean).join(' · ');
+        return `
+          <div class="src-${sc}">
+            <div class="result-card">
+              <div class="result-top">
+                <div class="result-meta">
+                  <div class="result-title" title="${escHtml(r.title)}">${escHtml(r.title)}</div>
+                  <div class="result-info">
+                    <span class="result-artist">${escHtml(info)}</span>
+                  </div>
+                </div>
+                <span class="source-badge ${badge}">${SOURCE_ICONS[r.source] || ''} ${SOURCE_LABELS[r.source] || r.source}</span>
+              </div>
+              ${r.why_dope ? `<div class="why-dope">${escHtml(r.why_dope)}</div>` : ''}
+              ${r.flip_potential ? `
+                <div class="flip-section">
+                  <div class="flip-label">Flip potential</div>
+                  <div class="flip-text">${escHtml(r.flip_potential)}</div>
+                </div>` : ''}
+              <a href="${escHtml(r.link)}" target="_blank" rel="noopener" class="result-link">
+                Open track →
+              </a>
+            </div>
+          </div>`;
+      }).join('');
+      div.style.display = 'flex';
+      div.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>

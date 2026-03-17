@@ -5,13 +5,17 @@ import os
 import io
 import re
 import json
+import random
 import base64
 import secrets
 import tempfile
 import threading
 import functools
 import datetime
+import urllib.request
+import urllib.parse
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1130,6 +1134,250 @@ def perc_audio(job_id: str, idx: int):
         io.BytesIO(wav), mimetype="audio/wav",
         as_attachment=False, download_name=f"perc_loop_v{idx + 1}.wav",
     )
+
+
+# ── Crate Digger ──────────────────────────────────────────────────────────────
+
+def _format_duration(val) -> str:
+    try:
+        s = val
+        if isinstance(s, str) and ":" in s:
+            return s[:7]
+        s = int(float(s))
+        m, sec = divmod(s, 60)
+        return f"{m}:{sec:02d}"
+    except Exception:
+        return "?"
+
+
+def _generate_dig_query(genre: str, decade: str, mood: str) -> dict:
+    import anthropic
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    prompt = (
+        "You are a legendary crate digger and hip-hop producer. "
+        "Generate a creative, specific search query to find obscure, sample-worthy music.\n\n"
+        f"Genre preference: {genre}\n"
+        f"Era/decade: {decade}\n"
+        f"Mood: {mood}\n\n"
+        "Return ONLY a JSON object with:\n"
+        '- "query": search query (3-8 words, specific and evocative, like a real crate digger would type)\n'
+        '- "context": one sentence on what you\'re hunting for\n\n'
+        "Make it obscure, interesting, and sample-worthy. Not generic.\n"
+        "Example outputs:\n"
+        '{"query": "obscure ethiopian jazz collective 1974", "context": "Hunting for Mulatu-era Ethio-jazz with hypnotic rhythms and horn stabs"}\n'
+        '{"query": "forgotten west african highlife guitar breaks 1970s", "context": "Looking for Lagos sessions with clean guitar loops and polyrhythmic percussion"}\n'
+        "Return only JSON, no markdown."
+    )
+    msg = client.messages.create(
+        model="claude-opus-4-6", max_tokens=256,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = msg.content[0].text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return json.loads(text)
+
+
+def _search_archive(query: str) -> list:
+    params = urllib.parse.urlencode([
+        ("q", f"({query}) AND mediatype:audio"),
+        ("fl[]", "identifier"),
+        ("fl[]", "title"),
+        ("fl[]", "creator"),
+        ("fl[]", "date"),
+        ("fl[]", "length"),
+        ("rows", "40"),
+        ("output", "json"),
+        ("sort[]", "downloads desc"),
+    ])
+    url = f"https://archive.org/advancedsearch.php?{params}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "StudioAID/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        docs = data.get("response", {}).get("docs", [])
+        results = []
+        for doc in docs:
+            identifier = doc.get("identifier", "")
+            if not identifier:
+                continue
+            creator = doc.get("creator", "Unknown")
+            if isinstance(creator, list):
+                creator = creator[0] if creator else "Unknown"
+            date = doc.get("date", "") or ""
+            year = date[:4] if date else "?"
+            results.append({
+                "title": doc.get("title", "Unknown"),
+                "artist": creator,
+                "year": year,
+                "source": "archive.org",
+                "duration": _format_duration(doc.get("length", 0)),
+                "link": f"https://archive.org/details/{identifier}",
+            })
+        return results
+    except Exception:
+        return []
+
+
+def _search_youtube(query: str) -> list:
+    import yt_dlp
+    ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": True}
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch12:{query}", download=False)
+        entries = (info or {}).get("entries", []) or []
+        results = []
+        for e in entries:
+            if not e:
+                continue
+            date_str = str(e.get("upload_date", "") or "")
+            year = date_str[:4] if date_str else "?"
+            results.append({
+                "title": e.get("title", "Unknown"),
+                "artist": e.get("uploader") or e.get("channel") or "Unknown",
+                "year": year,
+                "source": "youtube",
+                "duration": _format_duration(e.get("duration") or 0),
+                "link": f"https://www.youtube.com/watch?v={e.get('id', '')}",
+            })
+        return results
+    except Exception:
+        return []
+
+
+def _search_freesound(query: str) -> list:
+    api_key = os.environ.get("FREESOUND_API_KEY", "")
+    if not api_key:
+        return []
+    params = urllib.parse.urlencode({
+        "query": query,
+        "token": api_key,
+        "fields": "id,name,duration,username",
+        "page_size": "20",
+        "filter": "duration:[30 TO 600]",
+    })
+    url = f"https://freesound.org/apiv2/search/text/?{params}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "StudioAID/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+        results = []
+        for s in data.get("results", []):
+            uname = s.get("username", "unknown")
+            sid = s.get("id", "")
+            results.append({
+                "title": s.get("name", "Unknown"),
+                "artist": uname,
+                "year": "?",
+                "source": "freesound",
+                "duration": _format_duration(s.get("duration", 0)),
+                "link": f"https://freesound.org/people/{uname}/sounds/{sid}/",
+            })
+        return results
+    except Exception:
+        return []
+
+
+def _analyze_flip_potential(tracks: list, context: str) -> list:
+    import anthropic
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    track_list = "\n".join(
+        f"{i+1}. \"{t['title']}\" by {t['artist']} ({t['year']}) [{t['source']}]"
+        for i, t in enumerate(tracks)
+    )
+    prompt = (
+        f"You are a legendary hip-hop producer and crate digger.\n"
+        f"Dig context: {context}\n\n"
+        f"Analyze these tracks for sample potential:\n{track_list}\n\n"
+        "For each track return a JSON object in an array with:\n"
+        '- "flip_potential": 2-3 sentences. Be specific: mention likely elements '
+        '(chord voicings, drum breaks, bass lines, string arrangements, atmosphere, '
+        'tempo feel, lo-fi texture, vinyl warmth, horn stabs etc.)\n'
+        '- "why_dope": ONE punchy sentence max 12 words, starts with an emoji, '
+        'sounds like a producer talking — not corporate\n\n'
+        "Return ONLY a JSON array with exactly the same count as tracks. No markdown."
+    )
+    try:
+        msg = client.messages.create(
+            model="claude-opus-4-6", max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = msg.content[0].text.strip()
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        analyses = json.loads(text)
+        for i, t in enumerate(tracks):
+            a = analyses[i] if i < len(analyses) else {}
+            t["flip_potential"] = a.get("flip_potential", "")
+            t["why_dope"] = a.get("why_dope", "")
+    except Exception:
+        for t in tracks:
+            t.setdefault("flip_potential", "")
+            t.setdefault("why_dope", "")
+    return tracks
+
+
+@app.route("/crate-digger")
+@login_required
+def crate_digger():
+    return render_template("crate_digger.html")
+
+
+@app.route("/crate-dig", methods=["POST"])
+@login_required
+def crate_dig():
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
+
+    genre  = request.form.get("genre",  "surprise me")
+    decade = request.form.get("decade", "random")
+    mood   = request.form.get("mood",   "random")
+
+    try:
+        # 1. Claude generates the creative search query
+        dig_info = _generate_dig_query(genre, decade, mood)
+        query   = dig_info.get("query", f"{genre} music")
+        context = dig_info.get("context", "")
+
+        # 2. Search all sources in parallel
+        all_results: list = []
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            futures = {
+                ex.submit(_search_archive,  query): "archive",
+                ex.submit(_search_youtube,  query): "youtube",
+                ex.submit(_search_freesound, query): "freesound",
+            }
+            for fut in as_completed(futures, timeout=18):
+                try:
+                    all_results.extend(fut.result())
+                except Exception:
+                    pass
+
+        if not all_results:
+            return jsonify({"error": "No results found. Try different filters."}), 404
+
+        # 3. Pick 3 results — prefer one per source for variety
+        random.shuffle(all_results)
+        picked, seen_sources = [], set()
+        for r in all_results:
+            if r["source"] not in seen_sources and len(picked) < 3:
+                picked.append(r)
+                seen_sources.add(r["source"])
+        for r in all_results:
+            if len(picked) >= 3:
+                break
+            if r not in picked:
+                picked.append(r)
+        picked = picked[:3]
+
+        # 4. Claude analyzes flip potential for each
+        picked = _analyze_flip_potential(picked, context)
+
+        return jsonify({"query": query, "context": context, "results": picked})
+
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 if __name__ == "__main__":
